@@ -1,0 +1,36 @@
+# 環境變數（含密碼、金鑰）
+.env
+.env.*
+!.env.example
+
+# 虛擬環境
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# 數位憑證
+*.pfx
+*.pem
+*.cer
+*.key
+
+# 日誌
+log/
+*.log
+
+# 編輯器
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系統
+.DS_Store
+Thumbs.db
