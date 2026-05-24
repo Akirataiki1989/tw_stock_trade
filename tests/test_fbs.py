@@ -49,3 +49,40 @@ def test_disconnect_clears_state():
     c._rest = MagicMock()
     c.disconnect()
     assert c.is_connected() is False
+
+
+# ── sync_instruments ────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_sync_instruments_returns_count(client):
+    """sync_instruments() 回傳寫入筆數，並呼叫 db.execute + db.commit。"""
+    from unittest.mock import AsyncMock, patch
+
+    fake_data = {
+        "data": [
+            {"symbol": "2330", "name": "台積電", "industry": "24"},
+            {"symbol": "2317", "name": "鴻海", "industry": "28"},
+        ]
+    }
+    mock_db = AsyncMock()
+
+    with patch("app.services.fbs.asyncio.to_thread", new=AsyncMock(return_value=fake_data)):
+        count = await client.sync_instruments(mock_db)
+
+    assert count == 2
+    mock_db.execute.assert_called_once()
+    mock_db.commit.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_sync_instruments_empty_data(client):
+    """data 為空時回傳 0，不呼叫 db.execute。"""
+    from unittest.mock import AsyncMock, patch
+
+    with patch("app.services.fbs.asyncio.to_thread", new=AsyncMock(return_value={"data": []})):
+        mock_db = AsyncMock()
+        count = await client.sync_instruments(mock_db)
+
+    assert count == 0
+    mock_db.execute.assert_not_called()
+

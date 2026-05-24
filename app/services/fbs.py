@@ -63,6 +63,46 @@ class FbsClient:
     def is_connected(self) -> bool:
         return self._sdk is not None and self._rest is not None
 
+    # ── 背景同步（存 DB）────────────────────────────────────────────────────
+
+    async def sync_instruments(self, db: AsyncSession) -> int:
+        """從 FBS 拉取全部股票清單，批次 upsert 到 market.instruments。
+
+        Returns:
+            寫入（新增 + 更新）的筆數。
+        """
+        raw: dict = await asyncio.to_thread(
+            self._rest.stock.intraday.tickers, type="EQUITY"
+        )
+        rows: list[dict] = raw.get("data", [])
+        if not rows:
+            logger.warning("sync_instruments: FBS returned empty ticker list")
+            return 0
+
+        values = [
+            {
+                "symbol": r["symbol"],
+                "name": r.get("name"),
+                "industry": r.get("industry"),
+            }
+            for r in rows
+        ]
+
+        stmt = pg_insert(Instrument).values(values)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["symbol"],
+            set_={
+                "name": stmt.excluded.name,
+                "industry": stmt.excluded.industry,
+                "last_synced": func.now(),
+            },
+        )
+        await db.execute(stmt)
+        await db.commit()
+        logger.info("sync_instruments: upserted %d instruments", len(values))
+        return len(values)
+
+
 
 # 模組層級 singleton — ARQ Worker 與 FastAPI endpoint import 這個
 fbs_client = FbsClient()
