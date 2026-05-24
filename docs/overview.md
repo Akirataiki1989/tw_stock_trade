@@ -15,7 +15,7 @@
 | ✅ | Pydantic Schemas | `app/schemas/portfolio.py` / `market.py` / `ai.py` |
 | ✅ | portfolio / market API | `app/api/`, `app/services/`，6 個 endpoint |
 | ✅ | FBS SDK 接入 | `app/services/fbs.py` 實作完成：FbsClient singleton、sync_* / fetch_* 方法；`trading.watchlist` 表（migration 0002） |
-| ⏳ | ARQ Worker | 待 FBS SDK |
+| ✅ | ARQ Worker | `app/worker.py` (WorkerSettings + startup/shutdown) + `app/tasks.py` (5 個 cron tasks：instruments/quotes/intraday_candles/historical_candles/clear_intraday) |
 | ⏳ | LangGraph Agent | 待 ARQ Worker |
 | ⏳ | WebSocket 推送 | 待 market API + LangGraph |
 | ⏳ | Docker Compose | 最終整合 |
@@ -41,6 +41,8 @@
 | `app/services/portfolio.py` | Portfolio / Holding / Trade / Performance 查詢，stats 計算 |
 | `app/services/market.py` | Quote / Candle 查詢，Instrument 搜尋 |
 | `app/services/fbs.py` | FbsClient singleton：connect/disconnect、sync_instruments/quote/candles、fetch_quote/candles |
+| `app/tasks.py` | 自訂 TRACE 層級、`is_trading_hours()`、`get_watch_symbols()`、5 個 cron task 函式 |
+| `app/worker.py` | ARQ `WorkerSettings`（redis、cron_jobs、max_jobs=10、job_timeout=300）、`startup`/`shutdown` hooks |
 | `alembic/versions/0002_add_watchlist.py` | 新增 `trading.watchlist` 表 migration |
 | `app/api/portfolio.py` | GET /portfolio, /holdings, /trades, /performance, /stats；POST /portfolio/init |
 | `app/api/market.py` | GET /market/quote/{symbol}, /candles/{symbol}, /search |

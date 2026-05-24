@@ -53,6 +53,8 @@
 | fastapi-users 認證 | `app/main.py`, `app/users.py`, `app/schemas/user.py` | JWT Bearer 認證，register / login / logout / me 端點 |
 | Pydantic Schemas | `app/schemas/portfolio.py`, `market.py`, `ai.py` | Read schemas + PortfolioStats / CandleResponse / AnalyzeRequest |
 | portfolio / market API | `app/api/portfolio.py`, `app/api/market.py`, `app/services/portfolio.py`, `app/services/market.py` | 6 個 REST endpoint，含 portfolio init / stats / candle timeframe 路由 |
+| FBS SDK 接入 | `app/services/fbs.py` | FbsClient singleton、sync_*/fetch_* 方法、isClose probe |
+| ARQ Worker | `app/tasks.py`, `app/worker.py` | 5 個 cron tasks：instruments（08:30）、quotes（每分鐘）、intraday_candles（每 5 分）、historical_candles（14:00）、clear_intraday（14:30）；isClose probe 處理假日 |
 
 ---
 
@@ -107,11 +109,11 @@
 **前置條件**：Step 4 FBS SDK  
 **後置任務**：Step 6 LangGraph Agent  
 
-- [ ] `app/worker.py`（WorkerSettings + task 定義）
-- [ ] Task：定時同步 market_quotes（盤中每分鐘）
-- [ ] Task：定時同步 historical_candles（每日盤後）
-- [ ] Task：每日盤後清除 intraday_candles
-- [ ] 設定 Redis 連線（`settings.redis_url`）
+- [x] 建立 Redis Docker container（port 6379:6379，docker-compose.yaml）
+- [x] `app/tasks.py`（TRACE 層級、is_trading_hours()、get_watch_symbols()、5 個 cron task）
+- [x] `app/worker.py`（WorkerSettings + startup/shutdown hooks）
+- [x] 設定 Redis 連線（`settings.redis_url`）
+- [x] NAS DSM SSH 手動驗證：Worker 啟動、cron 觸發正常
 
 ---
 

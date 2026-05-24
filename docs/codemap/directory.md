@@ -22,6 +22,8 @@
 | `app/services/portfolio.py` | — | Portfolio / Holding / Trade / Performance 查詢；stats 聚合計算 |
 | `app/services/market.py` | — | Quote / Candle 查詢（自動路由歷史/盤中）；Instrument 搜尋 |
 | `app/services/fbs.py` | [fbs.md](app/services/fbs.md) | `FbsClient` singleton：connect/disconnect/is_connected；sync_instruments/quote/intraday_candles/historical_candles；fetch_quote/candles |
+| `app/tasks.py` | [tasks.md](app/tasks.md) | TRACE 層級、is_trading_hours()、get_watch_symbols()、5 個 cron tasks |
+| `app/worker.py` | [worker.md](app/worker.md) | ARQ WorkerSettings + startup/shutdown hooks |
 | `app/api/portfolio.py` | — | GET /portfolio, /holdings, /trades, /performance, /stats；POST /portfolio/init |
 | `app/api/market.py` | — | GET /market/quote/{symbol}, /candles/{symbol}, /search |
 
@@ -37,5 +39,4 @@
 
 | 路徑 | 說明 | 前置條件 |
 |------|------|---------|
-| `app/worker.py` | ARQ Worker | ✅ FBS SDK |
 | `app/agents/` | LangGraph Agent | ARQ Worker |
