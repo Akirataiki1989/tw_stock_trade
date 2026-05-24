@@ -31,7 +31,7 @@
 |-----------|---------|------|
 | `alembic/env.py` | [env.md](alembic/env.md) | async migration 設定，`include_schemas=True` |
 | `alembic/versions/0001_initial_schema.py` | [0001.md](alembic/versions/0001.md) | 初始 migration：建立 3 schema × 9 資料表 |
-| `alembic/versions/0002_add_watchlist.py` | — | migration 0002：新增 `trading.watchlist` 表 |
+| `alembic/versions/0002_add_watchlist.py` | [0002.md](alembic/versions/0002.md) | migration 0002：新增 `trading.watchlist` 表 |
 
 ## 待建模組（尚無對應 CodeMap）
 
