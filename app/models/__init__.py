@@ -1,6 +1,13 @@
 from app.models.base import Base
 from app.models.market import HistoricalCandle, Instrument, IntradayCandle, MarketQuote
-from app.models.portfolio import AiDecision, DailyPerformance, Holding, Portfolio, Trade
+from app.models.portfolio import (
+    AiDecision,
+    DailyPerformance,
+    Holding,
+    Portfolio,
+    Trade,
+    Watchlist,
+)
 from app.models.user import User
 
 __all__ = [
@@ -9,6 +16,7 @@ __all__ = [
     "Portfolio",
     "Holding",
     "Trade",
+    "Watchlist",
     "AiDecision",
     "DailyPerformance",
     "Instrument",

@@ -81,7 +81,9 @@ class Trade(Base):
     net_amount: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False)
     decision_reason: Mapped[Optional[str]] = mapped_column(Text)
     realized_pnl: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False, server_default="0")
-    realized_pnl_pct: Mapped[float] = mapped_column(Numeric(8, 4), nullable=False, server_default="0")
+    realized_pnl_pct: Mapped[float] = mapped_column(
+        Numeric(8, 4), nullable=False, server_default="0"
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -116,10 +118,29 @@ class DailyPerformance(Base):
     total_value: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False)
     cash: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False)
     holdings_value: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False)
-    daily_return_pct: Mapped[float] = mapped_column(Numeric(8, 4), nullable=False, server_default="0")
+    daily_return_pct: Mapped[float] = mapped_column(
+        Numeric(8, 4), nullable=False, server_default="0"
+    )
     cumulative_return_pct: Mapped[float] = mapped_column(
         Numeric(8, 4), nullable=False, server_default="0"
     )
     total_trades: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     winning_trades: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Watchlist(Base):
+    __tablename__ = "watchlist"
+    __table_args__ = (UniqueConstraint("user_id", "symbol"), {"schema": "trading"})
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("public.users.id", ondelete="CASCADE"), nullable=False
+    )
+    symbol: Mapped[str] = mapped_column(
+        String(10), ForeignKey("market.instruments.symbol"), nullable=False
+    )
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
