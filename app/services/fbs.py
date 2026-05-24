@@ -182,7 +182,7 @@ class FbsClient:
             {
                 "symbol": symbol,
                 "timeframe": timeframe,
-                "ts": datetime.fromisoformat(r["time"]),
+                "ts": datetime.fromisoformat(r["date"]),
                 "open": r.get("open"),
                 "high": r.get("high"),
                 "low": r.get("low"),
@@ -191,7 +191,7 @@ class FbsClient:
                 "average": r.get("average"),
             }
             for r in rows
-            if r.get("time")  # 跳過無 timestamp 的資料
+            if r.get("date")  # 跳過無 timestamp 的資料
         ]
         if not values:
             return 0

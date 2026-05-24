@@ -154,9 +154,9 @@ async def test_sync_intraday_candles_returns_count(client):
 
     fake_data = {
         "data": [
-            {"time": "2026-05-24T09:00:00+08:00", "open": 100, "high": 105,
+            {"date": "2026-05-24T09:00:00+08:00", "open": 100, "high": 105,
              "low": 99, "close": 103, "volume": 500, "average": 102.0},
-            {"time": "2026-05-24T09:01:00+08:00", "open": 103, "high": 106,
+            {"date": "2026-05-24T09:05:00+08:00", "open": 103, "high": 106,
              "low": 102, "close": 105, "volume": 300, "average": 104.0},
         ]
     }
