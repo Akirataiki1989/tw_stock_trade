@@ -99,7 +99,13 @@ result = rest.stock.intraday.quote(symbol="2330")
 ```python
 result = rest.stock.intraday.candles(symbol="2330", timeframe="1")
 # timeframe: "1" / "5" / "10" / "15" / "30" / "60"
-# result['data']: [{'open', 'high', 'low', 'close', 'volume', 'average'}, ...]
+# result['data']: [
+#   {
+#     'date': '2026-05-22T09:00:00.000+08:00',  # ⚠️ 欄位名稱是 "date"，不是 "time"
+#     'open': 100, 'high': 105, 'low': 99, 'close': 103,
+#     'volume': 500, 'average': 102.0
+#   }, ...
+# ]
 ```
 
 ---
@@ -130,7 +136,9 @@ result = rest.stock.historical.candles(**{
 
 - `sdk.exchange_realtime_token()` **不傳任何參數**
 - REST client 為**同步 API**，設計供 ARQ Worker 呼叫；在 FastAPI async context 需用 `asyncio.to_thread()`
-- Token 有效期未知，Worker 設計需考慮重新連線機制
+- Token 有效期未知，官方文件無說明，目前不主動刷新
 - `volume` 單位：歷史K線為股（shares），盤中視 type 而定
 - 歷史K線最多查 1 年，超過需分批查詢
 - WebSocket 即時推送走 `fubon_neo.adapter.WebSocketStockClientWrapper`（Step 7 待實作）
+- **`isClose: True`**：`intraday.quote` 回傳此旗標表示今日休市（國定假日、颱風假等）；Worker 以 `fetch_quote("2330")` 作為 isClose probe，比靜態假日行事曆更可靠
+- **Segmentation fault on process exit**：SDK C extension 已知問題，僅在一次性腳本退出時出現，ARQ Worker 長跑環境不受影響，無需處理
