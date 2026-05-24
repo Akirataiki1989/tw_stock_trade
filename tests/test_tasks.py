@@ -101,3 +101,236 @@ async def test_get_watch_symbols_empty():
     symbols = await get_watch_symbols(mock_db)
 
     assert symbols == []
+
+
+# ── task_sync_instruments ────────────────────────────────────────────────────
+
+async def test_task_sync_instruments_calls_fbs(monkeypatch):
+    """task_sync_instruments 呼叫 fbs_client.sync_instruments(db)。"""
+    from unittest.mock import AsyncMock, MagicMock
+    import app.tasks as tasks_module
+
+    mock_sync = AsyncMock(return_value=5)
+    monkeypatch.setattr(tasks_module.fbs_client, "sync_instruments", mock_sync)
+
+    mock_db = AsyncMock()
+    mock_db_factory = MagicMock()
+    mock_db_factory.return_value.__aenter__ = AsyncMock(return_value=mock_db)
+    mock_db_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    ctx = {"db_factory": mock_db_factory}
+    await tasks_module.task_sync_instruments(ctx)
+
+    mock_sync.assert_called_once_with(mock_db)
+
+
+# ── task_sync_quotes ─────────────────────────────────────────────────────────
+
+async def test_task_sync_quotes_skip_outside_hours(monkeypatch):
+    """非交易時間 → 直接 return，不查 DB 也不呼叫 FBS。"""
+    from unittest.mock import AsyncMock, MagicMock
+    import app.tasks as tasks_module
+
+    monkeypatch.setattr(tasks_module, "is_trading_hours", lambda: False)
+    mock_db_factory = MagicMock()
+    ctx = {"db_factory": mock_db_factory}
+
+    await tasks_module.task_sync_quotes(ctx)
+
+    mock_db_factory.assert_not_called()
+
+
+async def test_task_sync_quotes_skip_market_closed(monkeypatch):
+    """交易時間內但 isClose=True → 跳過，不同步。"""
+    from unittest.mock import AsyncMock, MagicMock
+    import app.tasks as tasks_module
+
+    monkeypatch.setattr(tasks_module, "is_trading_hours", lambda: True)
+    monkeypatch.setattr(
+        tasks_module.fbs_client, "fetch_quote",
+        AsyncMock(return_value={"isClose": True})
+    )
+
+    mock_db_factory = MagicMock()
+    ctx = {"db_factory": mock_db_factory}
+
+    await tasks_module.task_sync_quotes(ctx)
+
+    mock_db_factory.assert_not_called()
+
+
+async def test_task_sync_quotes_syncs_all_symbols(monkeypatch):
+    """正常盤中：對每個 symbol 呼叫一次 sync_quote。"""
+    from unittest.mock import AsyncMock, MagicMock, call
+    import app.tasks as tasks_module
+
+    monkeypatch.setattr(tasks_module, "is_trading_hours", lambda: True)
+    monkeypatch.setattr(
+        tasks_module.fbs_client, "fetch_quote",
+        AsyncMock(return_value={"isClose": False})
+    )
+    monkeypatch.setattr(tasks_module, "get_watch_symbols", AsyncMock(return_value=["2330", "2317"]))
+
+    mock_sync = AsyncMock(return_value=True)
+    monkeypatch.setattr(tasks_module.fbs_client, "sync_quote", mock_sync)
+
+    mock_db = AsyncMock()
+    mock_db_factory = MagicMock()
+    mock_db_factory.return_value.__aenter__ = AsyncMock(return_value=mock_db)
+    mock_db_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+    ctx = {"db_factory": mock_db_factory}
+
+    await tasks_module.task_sync_quotes(ctx)
+
+    assert mock_sync.call_count == 2
+    mock_sync.assert_any_call(mock_db, "2330")
+    mock_sync.assert_any_call(mock_db, "2317")
+
+
+# ── task_sync_intraday_candles ────────────────────────────────────────────────
+
+async def test_task_sync_intraday_candles_skip_outside_hours(monkeypatch):
+    """非交易時間 → 跳過。"""
+    from unittest.mock import MagicMock
+    import app.tasks as tasks_module
+
+    monkeypatch.setattr(tasks_module, "is_trading_hours", lambda: False)
+    mock_db_factory = MagicMock()
+    ctx = {"db_factory": mock_db_factory}
+
+    await tasks_module.task_sync_intraday_candles(ctx)
+
+    mock_db_factory.assert_not_called()
+
+
+async def test_task_sync_intraday_candles_uses_tf5(monkeypatch):
+    """盤中 → 以 timeframe='5' 呼叫 sync_intraday_candles。"""
+    from unittest.mock import AsyncMock, MagicMock
+    import app.tasks as tasks_module
+
+    monkeypatch.setattr(tasks_module, "is_trading_hours", lambda: True)
+    monkeypatch.setattr(tasks_module, "get_watch_symbols", AsyncMock(return_value=["2330"]))
+
+    mock_sync = AsyncMock(return_value=12)
+    monkeypatch.setattr(tasks_module.fbs_client, "sync_intraday_candles", mock_sync)
+
+    mock_db = AsyncMock()
+    mock_db_factory = MagicMock()
+    mock_db_factory.return_value.__aenter__ = AsyncMock(return_value=mock_db)
+    mock_db_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+    ctx = {"db_factory": mock_db_factory}
+
+    await tasks_module.task_sync_intraday_candles(ctx)
+
+    mock_sync.assert_called_once_with(mock_db, "2330", "5")
+
+
+# ── task_sync_historical_candles ──────────────────────────────────────────────
+
+async def test_task_sync_historical_candles_initial_load(monkeypatch):
+    """首次載入（DB 無資料）→ 補抓 2 年（可能分兩次查）。"""
+    from datetime import date, timedelta
+    from unittest.mock import AsyncMock, MagicMock, call
+    import app.tasks as tasks_module
+
+    monkeypatch.setattr(tasks_module, "get_watch_symbols", AsyncMock(return_value=["2330"]))
+
+    mock_sync = AsyncMock(return_value=50)
+    monkeypatch.setattr(tasks_module.fbs_client, "sync_historical_candles", mock_sync)
+
+    # DB scalar 回傳 None → 首次載入
+    mock_db = AsyncMock()
+    mock_db.scalar.return_value = None
+    mock_db_factory = MagicMock()
+    mock_db_factory.return_value.__aenter__ = AsyncMock(return_value=mock_db)
+    mock_db_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+    ctx = {"db_factory": mock_db_factory}
+
+    await tasks_module.task_sync_historical_candles(ctx)
+
+    # 2 年 = 730 天 > 365 天限制 → 一定拆兩次
+    assert mock_sync.call_count == 2
+
+    # 第一次 from_date 距今 ≥ 729 天
+    first_call_from = mock_sync.call_args_list[0].args[3]
+    assert (date.today() - first_call_from).days >= 729
+
+
+async def test_task_sync_historical_candles_incremental(monkeypatch):
+    """增量同步：last_date 為昨天 → 只查今天一筆。"""
+    from datetime import date, timedelta
+    from unittest.mock import AsyncMock, MagicMock
+
+    import app.tasks as tasks_module
+
+    monkeypatch.setattr(tasks_module, "get_watch_symbols", AsyncMock(return_value=["2330"]))
+
+    mock_sync = AsyncMock(return_value=1)
+    monkeypatch.setattr(tasks_module.fbs_client, "sync_historical_candles", mock_sync)
+
+    yesterday = date.today() - timedelta(days=1)
+    mock_db = AsyncMock()
+    mock_db.scalar.return_value = yesterday  # last_date = 昨天
+    mock_db_factory = MagicMock()
+    mock_db_factory.return_value.__aenter__ = AsyncMock(return_value=mock_db)
+    mock_db_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+    ctx = {"db_factory": mock_db_factory}
+
+    await tasks_module.task_sync_historical_candles(ctx)
+
+    # from_date = yesterday + 1 = today → 只呼叫一次
+    assert mock_sync.call_count == 1
+    call_args = mock_sync.call_args
+    assert call_args.args[3] == date.today()
+    assert call_args.args[4] == date.today()
+
+
+async def test_task_sync_historical_candles_up_to_date(monkeypatch):
+    """last_date = 今天 → 已是最新，不呼叫 sync。"""
+    from datetime import date
+    from unittest.mock import AsyncMock, MagicMock
+
+    import app.tasks as tasks_module
+
+    monkeypatch.setattr(tasks_module, "get_watch_symbols", AsyncMock(return_value=["2330"]))
+
+    mock_sync = AsyncMock(return_value=0)
+    monkeypatch.setattr(tasks_module.fbs_client, "sync_historical_candles", mock_sync)
+
+    mock_db = AsyncMock()
+    mock_db.scalar.return_value = date.today()  # last_date = 今天
+    mock_db_factory = MagicMock()
+    mock_db_factory.return_value.__aenter__ = AsyncMock(return_value=mock_db)
+    mock_db_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+    ctx = {"db_factory": mock_db_factory}
+
+    await tasks_module.task_sync_historical_candles(ctx)
+
+    mock_sync.assert_not_called()
+
+
+# ── task_clear_intraday_candles ───────────────────────────────────────────────
+
+async def test_task_clear_intraday_candles_executes_delete(monkeypatch):
+    """task_clear_intraday_candles 呼叫 DELETE FROM market.intraday_candles 並 commit。"""
+    from unittest.mock import AsyncMock, MagicMock
+    import app.tasks as tasks_module
+
+    mock_db = AsyncMock()
+    mock_db_factory = MagicMock()
+    mock_db_factory.return_value.__aenter__ = AsyncMock(return_value=mock_db)
+    mock_db_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+    ctx = {"db_factory": mock_db_factory}
+
+    await tasks_module.task_clear_intraday_candles(ctx)
+
+    mock_db.execute.assert_called_once()
+    # 確認 SQL 包含 DELETE
+    executed_sql = str(mock_db.execute.call_args.args[0])
+    assert "DELETE" in executed_sql.upper() or "delete" in executed_sql
+    mock_db.commit.assert_called_once()
+
+
+
+
+
