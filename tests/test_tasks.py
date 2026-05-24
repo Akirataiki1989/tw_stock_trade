@@ -331,6 +331,60 @@ async def test_task_clear_intraday_candles_executes_delete(monkeypatch):
     mock_db.commit.assert_called_once()
 
 
+# ── worker startup / shutdown ─────────────────────────────────────────────────
+
+async def test_startup_sets_db_factory(monkeypatch):
+    """startup() 成功時 ctx['db_factory'] 被設定。"""
+    from unittest.mock import MagicMock, patch
+    from app.worker import startup
+
+    monkeypatch.setattr("app.worker.fbs_client.connect", MagicMock())
+
+    ctx: dict = {}
+    with patch("app.worker.create_async_engine"), \
+         patch("app.worker.async_sessionmaker") as mock_sm:
+        mock_sm.return_value = "fake_factory"
+        await startup(ctx)
+
+    assert ctx["db_factory"] == "fake_factory"
+    assert "engine" in ctx
+
+
+async def test_startup_raises_on_fbs_failure(monkeypatch):
+    """startup() 時 FBS 登入失敗 → 拋 RuntimeError（讓 ARQ 感知）。"""
+    import pytest
+    from unittest.mock import MagicMock
+    from app.worker import startup
+
+    monkeypatch.setattr(
+        "app.worker.fbs_client.connect",
+        MagicMock(side_effect=RuntimeError("FBS login failed"))
+    )
+
+    ctx: dict = {}
+    with pytest.raises(RuntimeError, match="FBS login failed"):
+        await startup(ctx)
+
+
+async def test_shutdown_calls_disconnect(monkeypatch):
+    """shutdown() 呼召 fbs_client.disconnect()。"""
+    from unittest.mock import AsyncMock, MagicMock
+    from app.worker import shutdown
+
+    mock_disconnect = MagicMock()
+    monkeypatch.setattr("app.worker.fbs_client.disconnect", mock_disconnect)
+
+    mock_engine = MagicMock()
+    mock_engine.dispose = AsyncMock()
+    ctx = {"engine": mock_engine}
+
+    await shutdown(ctx)
+
+    mock_disconnect.assert_called_once()
+    mock_engine.dispose.assert_called_once()
+
+
+
 
 
 
