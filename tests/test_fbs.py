@@ -86,3 +86,62 @@ async def test_sync_instruments_empty_data(client):
     assert count == 0
     mock_db.execute.assert_not_called()
 
+
+# ── sync_quote ──────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_sync_quote_success(client):
+    """正常回傳時 sync_quote() 回傳 True，呼叫 db.execute + db.commit。"""
+    from unittest.mock import AsyncMock, patch
+
+    fake_quote = {
+        "referencePrice": 2230, "previousClose": 2230,
+        "openPrice": 2245, "highPrice": 2260, "lowPrice": 2225,
+        "closePrice": 2255, "lastPrice": 2255, "lastSize": 3821,
+        "avgPrice": 2243.86, "change": 25, "changePercent": 1.12,
+        "amplitude": 1.57, "bids": [], "asks": [], "total": {},
+    }
+    mock_db = AsyncMock()
+
+    with patch("app.services.fbs.asyncio.to_thread", new=AsyncMock(return_value=fake_quote)):
+        result = await client.sync_quote(mock_db, "2330")
+
+    assert result is True
+    mock_db.execute.assert_called_once()
+    mock_db.commit.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_sync_quote_429_returns_false(client):
+    """SDK 拋 429 例外時，sync_quote() 回傳 False 而非往上拋。"""
+    from unittest.mock import AsyncMock, patch
+
+    async def raise_429(*args, **kwargs):
+        raise Exception("429 Rate limit exceeded")
+
+    mock_db = AsyncMock()
+
+    with patch("app.services.fbs.asyncio.to_thread", new=raise_429):
+        result = await client.sync_quote(mock_db, "2330")
+
+    assert result is False
+    mock_db.execute.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_sync_quote_other_exception_propagates(client):
+    """非 429 例外應往上拋，讓 ARQ 重試機制感知。"""
+    from unittest.mock import AsyncMock, patch
+
+    async def raise_conn_err(*args, **kwargs):
+        raise ConnectionError("SDK connection lost")
+
+    mock_db = AsyncMock()
+
+    with (
+        patch("app.services.fbs.asyncio.to_thread", new=raise_conn_err),
+        pytest.raises(ConnectionError),
+    ):
+        await client.sync_quote(mock_db, "2330")
+
+

@@ -102,6 +102,65 @@ class FbsClient:
         logger.info("sync_instruments: upserted %d instruments", len(values))
         return len(values)
 
+    async def sync_quote(self, db: AsyncSession, symbol: str) -> bool:
+        """從 FBS 拉取單一股票即時報價，upsert 到 market.market_quotes。
+
+        Returns:
+            True=成功寫入；False=429 或資料為空（跳過，不拋例外）。
+        """
+        try:
+            raw: dict = await asyncio.to_thread(
+                self._rest.stock.intraday.quote, symbol=symbol
+            )
+        except Exception as e:
+            msg = str(e).lower()
+            if "429" in msg or "rate limit" in msg:
+                logger.warning("FBS 429 rate limit for symbol=%s, skipping", symbol)
+                return False
+            raise
+
+        if not raw:
+            logger.warning("sync_quote: empty response for symbol=%s", symbol)
+            return False
+
+        now = datetime.now(timezone.utc)
+        stmt = pg_insert(MarketQuote).values(
+            symbol=symbol,
+            reference_price=raw.get("referencePrice"),
+            prev_close=raw.get("previousClose"),
+            open_price=raw.get("openPrice"),
+            high_price=raw.get("highPrice"),
+            low_price=raw.get("lowPrice"),
+            close_price=raw.get("closePrice"),
+            last_price=raw.get("lastPrice"),
+            last_size=raw.get("lastSize"),
+            avg_price=raw.get("avgPrice"),
+            change=raw.get("change"),
+            change_pct=raw.get("changePercent"),
+            amplitude=raw.get("amplitude"),
+            bids=raw.get("bids"),
+            asks=raw.get("asks"),
+            total=raw.get("total"),
+            is_limit_up=False,
+            is_limit_down=False,
+            is_trial=False,
+            fetched_at=now,
+        )
+        update_cols = [
+            "reference_price", "prev_close", "open_price", "high_price", "low_price",
+            "close_price", "last_price", "last_size", "avg_price", "change",
+            "change_pct", "amplitude", "bids", "asks", "total",
+            "is_limit_up", "is_limit_down", "is_trial", "fetched_at",
+        ]
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["symbol"],
+            set_={col: getattr(stmt.excluded, col) for col in update_cols},
+        )
+        await db.execute(stmt)
+        await db.commit()
+        return True
+
+
 
 
 # 模組層級 singleton — ARQ Worker 與 FastAPI endpoint import 這個
