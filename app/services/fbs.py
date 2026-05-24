@@ -264,6 +264,64 @@ class FbsClient:
         )
         return len(values)
 
+    # ── On-demand 查詢（不存 DB）────────────────────────────────────────────
+
+    async def fetch_quote(self, symbol: str) -> dict | None:
+        """即時拉取單一股票報價，不存 DB。
+
+        供 FastAPI /market/search 預覽 與 /market/quote/{symbol} DB miss 時使用。
+
+        Returns:
+            FBS 回傳的 quote dict；例外時回傳 None。
+        """
+        try:
+            return await asyncio.to_thread(
+                self._rest.stock.intraday.quote, symbol=symbol
+            )
+        except Exception:
+            logger.warning("fetch_quote failed for symbol=%s", symbol, exc_info=True)
+            return None
+
+    async def fetch_candles(
+        self,
+        symbol: str,
+        timeframe: str,
+        from_date: date | None = None,
+        to_date: date | None = None,
+    ) -> list[dict]:
+        """即時拉取 K 棒資料，不存 DB。
+
+        timeframe in {"D","W","M"} 走 historical；其他走 intraday。
+
+        Returns:
+            K 棒 list；例外時回傳空 list。
+        """
+        try:
+            if timeframe in {"D", "W", "M"}:
+                raw = await asyncio.to_thread(
+                    self._rest.stock.historical.candles,
+                    **{
+                        "symbol": symbol,
+                        "from": (from_date or date.today()).isoformat(),
+                        "to": (to_date or date.today()).isoformat(),
+                        "timeframe": timeframe,
+                        "fields": "open,high,low,close,volume,turnover,change",
+                    },
+                )
+            else:
+                raw = await asyncio.to_thread(
+                    self._rest.stock.intraday.candles,
+                    symbol=symbol,
+                    timeframe=timeframe,
+                )
+            return raw.get("data", [])
+        except Exception:
+            logger.warning(
+                "fetch_candles failed for symbol=%s tf=%s", symbol, timeframe, exc_info=True
+            )
+            return []
+
+
 
 
 

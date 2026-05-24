@@ -215,5 +215,63 @@ async def test_sync_historical_candles_empty(client):
     mock_db.execute.assert_not_called()
 
 
+# ── fetch_quote / fetch_candles ──────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_fetch_quote_returns_dict(client):
+    """fetch_quote() 直接回傳 SDK dict，不寫 DB。"""
+    from unittest.mock import AsyncMock, patch
+
+    fake_quote = {"symbol": "2330", "lastPrice": 2255}
+    with patch("app.services.fbs.asyncio.to_thread", new=AsyncMock(return_value=fake_quote)):
+        result = await client.fetch_quote("2330")
+
+    assert result == fake_quote
+
+
+@pytest.mark.asyncio
+async def test_fetch_quote_none_on_exception(client):
+    """SDK 拋例外時 fetch_quote() 回傳 None（不拋）。"""
+    from unittest.mock import AsyncMock, patch
+
+    async def raise_err(*args, **kwargs):
+        raise Exception("network error")
+
+    with patch("app.services.fbs.asyncio.to_thread", new=raise_err):
+        result = await client.fetch_quote("2330")
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_fetch_candles_returns_list(client):
+    """fetch_candles() 直接回傳 K 棒 list，不寫 DB。"""
+    from datetime import date
+    from unittest.mock import AsyncMock, patch
+
+    fake_data = {"data": [{"date": "2026-05-22", "close": 2255}]}
+    with patch("app.services.fbs.asyncio.to_thread", new=AsyncMock(return_value=fake_data)):
+        result = await client.fetch_candles("2330", "D", date(2026, 5, 1), date(2026, 5, 22))
+
+    assert len(result) == 1
+    assert result[0]["date"] == "2026-05-22"
+
+
+@pytest.mark.asyncio
+async def test_fetch_candles_empty_on_exception(client):
+    """SDK 拋例外時 fetch_candles() 回傳空 list。"""
+    from datetime import date
+    from unittest.mock import AsyncMock, patch
+
+    async def raise_err(*args, **kwargs):
+        raise Exception("timeout")
+
+    with patch("app.services.fbs.asyncio.to_thread", new=raise_err):
+        result = await client.fetch_candles("2330", "D", date(2026, 5, 1), date(2026, 5, 22))
+
+    assert result == []
+
+
+
 
 
