@@ -39,7 +39,9 @@ class Instrument(Base):
     reference_price: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
     is_attention: Mapped[bool] = mapped_column(Boolean, server_default="false")
     is_disposition: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    last_synced: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_synced: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class MarketQuote(Base):

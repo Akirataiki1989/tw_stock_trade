@@ -1,112 +1,105 @@
-# tw_stock_trade — Claude 工作指引
+# tw_stock_trade — Claude Working Guide
 
-## 專案概述
-台股 AI 模擬交易平台後端。FastAPI + PostgreSQL + Redis + LangGraph。
-前端（React）獨立部署於 Vercel，本專案為純後端。
+## Project Overview
+Taiwan stock AI simulation trading platform backend. FastAPI + PostgreSQL + Redis + LangGraph.
+Frontend (React) is deployed independently on Vercel; this project is pure backend.
 
-## 環境
+## Environment
 
-| 項目 | 值 |
-|------|-----|
-| NAS 路徑 | `/volume1/web/codeserver/tw_stock_trade` |
-| Python | 3.12（NAS 本機） |
-| 套件管理 | `uv`（必須在 NAS 終端機執行，不能從 Windows） |
-| venv | `.venv/bin/python`、`.venv/bin/alembic` |
+| Item | Value |
+|------|-------|
+| NAS Path | `/volume1/web/codeserver/tw_stock_trade` |
+| Python | 3.12 (NAS local) |
+| Package Manager | `uv` (must run on NAS DSM terminal, not from Windows or code-server) |
+| uv binary (NAS DSM) | `/volume1/web/codeserver/.tools/uv` (copied from code-server container) |
+| venv | `.venv/bin/python`, `.venv/bin/alembic` |
+| App Port | `8090` (8000 is occupied) |
 
-### 常用指令
+### Common Commands
 ```bash
-# 安裝依賴
-uv sync
+# NAS DSM SSH：每次 session 必須先設定環境變數
+export PATH="/volume1/web/codeserver/.tools:$PATH"
+export UV_CACHE_DIR=/volume1/web/codeserver/.uv-cache
+export UV_DATA_DIR=/volume1/web/codeserver/.uv-data
+export UV_PYTHON_INSTALL_DIR=/volume1/web/codeserver/.uv-python
+
+# Install dependencies
+uv sync --dev
 
 # DB migration
 .venv/bin/alembic upgrade head
 .venv/bin/alembic downgrade base
 
-# Ruff 檢查
+# Ruff check
 uv run ruff check app/
 
-# 啟動開發伺服器
-.venv/bin/uvicorn app.main:app --reload
+# Start dev server (NAS DSM)
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8090
 ```
 
-## DB Schema 結構
+## Tech Stack
 
-```
-public.users                  ← fastapi-users 管理，JWT 認證
-market.instruments            ← 股票基本資料（來自 FBS /intraday/ticker）
-market.market_quotes          ← 即時報價快取（來自 FBS /intraday/quote）
-market.intraday_candles       ← 盤中 K 線，每日盤後可清除（timeframe: 1/5/10/15/30/60）
-market.historical_candles     ← 歷史 K 線，永久保留（timeframe: D/W/M）
-trading.portfolios            ← 每用戶一筆，現金與總資產
-trading.holdings              ← 持倉，market_value/unrealized_pnl 為 GENERATED ALWAYS AS STORED
-trading.trades                ← 交易紀錄，含手續費/稅/已實現損益
-trading.ai_decisions          ← LangGraph Agent 決策快照
-trading.daily_performance     ← 每日績效紀錄
-```
-
-跨 schema FK 寫法：`ForeignKey("public.users.id")`、`ForeignKey("market.instruments.symbol")`
-
-## 技術棧
-
-| 層 | 套件 |
-|----|------|
+| Layer | Package |
+|-------|---------|
 | Web | FastAPI + Uvicorn |
 | ORM | SQLAlchemy 2.0 async + asyncpg |
-| Migration | Alembic（async engine） |
-| 認證 | fastapi-users（JWT） |
-| 任務佇列 | ARQ + Redis |
+| Migration | Alembic (async engine) |
+| Auth | fastapi-users (JWT) |
+| Task Queue | ARQ + Redis |
 | AI | LangGraph + LangChain + Google Gemini |
-| 監控 | Langfuse |
-| 排程 | APScheduler |
-| 加密 | Fernet（AES-256，用於存 API Key） |
+| Monitoring | Langfuse |
+| Scheduler | APScheduler |
+| Encryption | Fernet (AES-256, for storing API Keys) |
 
-## 已知限制與慣例
+## Known Limitations & Conventions
 
-- `model_config` 在 pydantic-settings 不能加型別注解，否則會被當成欄位
-- `arq` 要求 `redis<6`，不要在 pyproject.toml 明確指定 redis 版本
-- `uv sync` 必須在 NAS 終端機執行，從 Windows 執行會建立 Windows 格式 venv（無 `bin/`）
-- Ruff `line-length = 100`，`select = ["E", "F", "I"]`
-- 所有 model 的 `__table_args__` 需包含 `{"schema": "market"}` 或 `{"schema": "trading"}`
-- 有 UniqueConstraint 時寫法：`__table_args__ = (UniqueConstraint(...), {"schema": "trading"})`
+- `model_config` in pydantic-settings must not have a type annotation, or it will be treated as a field
+- `arq` requires `redis<6`; do not explicitly pin the redis version in pyproject.toml
+- `uv sync` must run on the NAS terminal; running from Windows creates a Windows-format venv (no `bin/`)
+- Ruff `line-length = 100`, `select = ["E", "F", "I"]`
+- All model `__table_args__` must include `{"schema": "market"}` or `{"schema": "trading"}`
+- When UniqueConstraint is present: `__table_args__ = (UniqueConstraint(...), {"schema": "trading"})`
+- NAS DSM home dir (`/var/services/homes/Gui`) has filesystem issues; all uv dirs must be redirected to `/volume1/` via env vars
+- App runs directly on NAS DSM (not Docker); Docker Compose step is skipped; use Synology Task Scheduler for process management
 
-## 目錄結構
+## Working Style
 
-```
-tw_stock_trade/
-├── app/
-│   ├── core/
-│   │   └── config.py          ← pydantic-settings，讀 .env
-│   ├── models/
-│   │   ├── base.py            ← DeclarativeBase
-│   │   ├── user.py            ← fastapi-users User（public schema）
-│   │   ├── portfolio.py       ← trading schema 的所有 model
-│   │   └── market.py          ← market schema 的所有 model
-│   ├── api/                   ← 路由（待建）
-│   ├── schemas/               ← Pydantic request/response schemas（待建）
-│   ├── services/              ← 業務邏輯（待建）
-│   └── database.py            ← async engine + session
-├── alembic/
-│   ├── env.py                 ← include_schemas=True，version_table_schema="public"
-│   └── versions/
-│       └── 0001_initial_schema.py
-├── docs/
-│   ├── api.md                 ← API endpoint 規格
-│   ├── schema.md              ← DB schema 詳細說明
-│   └── fbs_api.md             ← FBS SDK 用法（API Key 生效後補）
-├── pyproject.toml
-├── alembic.ini
-└── .env                       ← 不進 git
-```
+### Communication
+- All responses must be in **Traditional Chinese**
+- For changes to 2+ files or any architectural decision, present a plan first and wait for explicit confirmation before proceeding
 
-## 開發進度
+### Proactive Pushback
+In the following cases, **raise a discussion first — do not execute directly**:
+- Logically inconsistent or contradictory requirements
+- Non-professional development practices (e.g. skipping tests, directly modifying production schema)
+- Plans that deviate from the main development roadmap (e.g. features not yet scheduled in current phase)
+- Technology choices that conflict with the existing tech stack
 
-- [x] DB Schema 設計與 migration
-- [x] SQLAlchemy models
-- [x] pydantic-settings config
-- [ ] fastapi-users 認證（下一步）
-- [ ] portfolio / market API 路由
-- [ ] FBS SDK 接入（API Key 待生效）
-- [ ] ARQ Worker
-- [ ] LangGraph Agent
-- [ ] WebSocket 推送
-- [ ] Docker Compose
+### Docs Maintenance
+When a development stage (roadmap Step) is complete, **proactively ask the user whether to update the docs**:
+- `docs/overview.md` — update status table (✅ / 🔜 / ⏳) and code map section
+- `docs/codemap/` — add a new `.md` for each newly created source file
+- `docs/codemap/directory.md` — update the directory tree index
+- `docs/progress/roadmap.md` — mark completed tasks, set next step
+- `docs/changelog/` — add new version entry
+
+### Tool Usage
+- For library documentation, use context7 MCP first (`resolve-library-id` + `query-docs`); do not rely on training data
+- For Python type issues, use the `LSP` tool (pyright-lsp is enabled)
+- For read-then-edit tasks (lint fixes, batch formatting, template-based edits): spawn a sub-agent with `model: haiku` to handle the work — do not consume main context for mechanical edits
+
+## Docs Index
+
+All detailed docs are in `docs/`.
+
+**New sessions: start with `docs/overview.md`** — one file covering current status, code map, DB structure, and drill-down links.
+
+| Need | File Path |
+|------|-----------|
+| **Project status / quick overview** | **`docs/overview.md`** |
+| DB ORM class ↔ table, FK diagram | `docs/schema/orm.md` |
+| DB column full specs | `docs/schema/tables.md` |
+| Code directory / file CodeMap | `docs/codemap/directory.md` |
+| API endpoint specs | `docs/api.md` |
+| Dev progress / task dependencies | `docs/progress/roadmap.md` |
+| Version update summary | `docs/changelog/Index.md` |

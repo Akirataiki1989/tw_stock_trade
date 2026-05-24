@@ -1,4 +1,7 @@
-# DB Schema 規格
+# DB 欄位規格
+
+> 原始 DB 欄位完整說明，適合撰寫 migration 或 raw SQL 時查閱。
+> ORM class 對應請查 [`orm.md`](orm.md)；API 回應格式請查 [`../api.md`](../api.md)。
 
 ## Schema 分層
 

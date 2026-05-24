@@ -1,11 +1,9 @@
+from pydantic_settings import BaseSettings
 from pydantic_settings.main import SettingsConfigDict
 
 
-from pydantic_settings import BaseSettings
-
-
 class Settings(BaseSettings):
-    model_config: SettingsConfigDict = SettingsConfigDict(
+    model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
@@ -38,7 +36,6 @@ class Settings(BaseSettings):
 
 
 def get_settings() -> Settings:
-    return Settings()
-
+    return Settings()  # type: ignore[call-arg]
 
 settings: Settings = get_settings()

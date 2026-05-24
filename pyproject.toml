@@ -22,6 +22,7 @@ dependencies = [
     "cryptography>=43.0.0",
     "aiohttp>=3.13.5",
     "python-dotenv>=1.0.0",
+    "fubon-neo",
 ]
 
 [dependency-groups]
@@ -40,3 +41,6 @@ select = ["E", "F", "I"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+
+[tool.uv.sources]
+fubon-neo = { path = "../fubon_neo-2.2.8-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl" }

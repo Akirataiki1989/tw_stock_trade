@@ -1,0 +1,1 @@
+3.12 git add .python-version git commit -m chore: pin Python to 3.12

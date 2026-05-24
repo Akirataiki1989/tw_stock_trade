@@ -669,25 +669,10 @@ EOF
 
 **確認回傳的 dict 有哪些 key**。若有時間欄位（可能叫 `time`、`ts`、`datetime`），記下欄位名稱後繼續；若沒有，跳到 Step 1b。
 
-- [ ] **Step 1b（若無 timestamp）：暫時跳過 intraday_candles 實作**
-
-若 API 回傳的 candle 無法對應到 `ts`，在 `sync_intraday_candles()` 中記錄 warning 並回傳 0，等 WebSocket 實作（Step 7）時補充：
-
-```python
-    async def sync_intraday_candles(
-        self, db: AsyncSession, symbol: str, timeframe: str
-    ) -> int:
-        logger.warning(
-            "sync_intraday_candles: timestamp field not confirmed in FBS API, skipping"
-        )
-        return 0
-```
-
-跳至 Step 5（commit）。
-
 - [ ] **Step 2：新增 sync_intraday_candles 測試**
 
-（假設 timestamp 欄位名為 `"time"`，若不同請替換）
+> ✅ 已確認：timestamp 欄位名稱為 `"date"`，格式 `"2026-05-22T09:00:00.000+08:00"`
+> ⚠️ Segmentation fault 是 FubonSDK C extension 的已知問題（進程退出時 GC 觸發），ARQ Worker 長跑環境不會出現，可忽略。
 
 在 `tests/test_fbs.py` 尾端加入：
 
@@ -701,9 +686,9 @@ async def test_sync_intraday_candles_returns_count(client):
 
     fake_data = {
         "data": [
-            {"time": "2026-05-24T09:00:00+08:00", "open": 100, "high": 105,
+            {"date": "2026-05-24T09:00:00.000+08:00", "open": 100, "high": 105,
              "low": 99, "close": 103, "volume": 500, "average": 102.0},
-            {"time": "2026-05-24T09:01:00+08:00", "open": 103, "high": 106,
+            {"date": "2026-05-24T09:01:00.000+08:00", "open": 103, "high": 106,
              "low": 102, "close": 105, "volume": 300, "average": 104.0},
         ]
     }
@@ -752,7 +737,7 @@ uv run pytest tests/test_fbs.py -v -k "sync_intraday"
             {
                 "symbol": symbol,
                 "timeframe": timeframe,
-                "ts": datetime.fromisoformat(r["time"]),
+                "ts": datetime.fromisoformat(r["date"]),  # FBS 盤中K線 timestamp 欄位名為 "date"
                 "open": r.get("open"),
                 "high": r.get("high"),
                 "low": r.get("low"),
@@ -761,7 +746,7 @@ uv run pytest tests/test_fbs.py -v -k "sync_intraday"
                 "average": r.get("average"),
             }
             for r in rows
-            if r.get("time")  # 跳過無 timestamp 的資料
+            if r.get("date")  # 跳過無 timestamp 的資料
         ]
         if not values:
             return 0

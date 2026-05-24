@@ -1,105 +1,136 @@
-# FBS Fubon Neo API 規格
+# FBS Fubon Neo SDK 使用指南
 
-文件來源：https://www.fbs.com.tw/TradeAPI/docs/market-data/http-api/getting-started
+> 最後更新：2026-05-23  
+> 文件來源：實際測試驗證（fubon_neo 2.2.8）
 
-## 認證
-- 使用 `fubon_neo` SDK 登入，需要帳號、密碼、數位憑證（.pfx）
-- 憑證路徑掛載於 Docker volume（只讀），不進 git
-- API Key 透過 Fernet 加密存 DB
+---
 
-## Intraday Endpoints
+## 套件資訊
 
-### GET /intraday/tickers
-查詢股票列表。
+- whl 路徑：`/volume1/web/codeserver/fubon_neo-2.2.8-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl`
+- 安裝方式：`uv add /volume1/web/codeserver/fubon_neo-2.2.8-....whl`
+- 憑證路徑：`/volume1/web/cert/F128147584.pfx`
 
-Request params:
-- `type` *: `EQUITY` / `INDEX` / `WARRANT` / `ODDLOT`
-- `exchange`: `TWSE` / `TPEx`
-- `market`: `TSE` / `OTC` / `ESB` / `TIB` / `PSB`
-- `industry`: 產業別代碼
-- `isNormal` / `isAttention` / `isDisposition` / `isHalted`: boolean 篩選
+---
 
-Response `data[]`:
-- `symbol`: 股票代碼
-- `name`: 股票簡稱
+## 初始化與登入
 
-### GET /intraday/ticker/{symbol}
-取得單一股票基本資料。
+```python
+from fubon_neo.sdk import FubonSDK
+from fubon_neo.adapter import build_rest_client
 
-Response 主要欄位：
-- `symbol`, `name`, `nameEn`, `industry`, `securityType`
-- `referencePrice`, `limitUpPrice`, `limitDownPrice`
-- `canDayTrade`, `canBuyDayTrade`
-- `boardLot`, `tradingCurrency`
-- `isAttention`, `isDisposition`
-- `previousClose`
+sdk = FubonSDK()
 
-### GET /intraday/quote/{symbol}
-取得即時報價。
+# 登入（cert 為 .pfx 憑證路徑）
+accounts = sdk.login(account, password, cert_path)
+# accounts.is_success: bool
+# accounts.data[0]: Account { name, branch_no, account, account_type }
 
-Response 主要欄位：
-- `referencePrice`, `previousClose`
-- `openPrice`, `openTime`, `highPrice`, `highTime`, `lowPrice`, `lowTime`
-- `closePrice`, `closeTime`, `lastPrice`, `lastSize`, `avgPrice`
-- `change`, `changePercent`, `amplitude`
-- `bids[]`, `asks[]`（委買委賣五檔）
-- `total`（成交統計物件）
-- `isLimitUpPrice`, `isLimitDownPrice`, `isTrial`, `isOpen`, `isClose`
-- `lastUpdated`
+account_obj = accounts.data[0]
 
-### GET /intraday/candles/{symbol}
-取得盤中 K 線。
+# 取得 market data token（不傳參數）
+token = sdk.exchange_realtime_token()
 
-Request params:
-- `type`: `oddlot`（零股）
-- `timeframe`: `1` / `5` / `10` / `15` / `30` / `60`（分鐘）
-- `sort`: `asc`（預設）/ `desc`
+# 建立 REST client
+rest = build_rest_client(token)
+# rest.stock      → 股票市場資料
+# rest.futopt     → 期貨選擇權（本專案不使用）
+# rest.options    → 選擇權
+```
 
-Response `data[]`:
-- `open`, `high`, `low`, `close`
-- `volume`（整股：張；零股：股）
-- `average`（均價）
+---
 
-### GET /intraday/trades/{symbol}
-取得成交明細。
+## SDK 模組結構
 
-### GET /intraday/volumes/{symbol}
-取得分價量表。
+| 屬性 | 類型 | 用途 |
+|------|------|------|
+| `sdk.stock` | `Stock` | **股票交易**（place_order、cancel_order 等），非市場資料 |
+| `sdk.accounting` | `Accounting` | 帳務查詢 |
+| `sdk.futopt` | `Futopt` | 期貨交易 |
+| `rest.stock` | `RestClientFactory.stock` | **股票市場資料**（本專案使用此處） |
 
-## Snapshot Endpoints
+> ⚠️ `sdk.stock` 是交易模組；市場資料要用 `rest.stock`（透過 `build_rest_client` 建立）
 
-### GET /snapshot/quotes/{market}
-全市場即時報價快照。
+---
 
-### GET /snapshot/movers/{market}
-漲跌幅排行。
+## 市場資料 API
 
-### GET /snapshot/actives/{market}
-成交量/額排行。
+### `rest.stock.intraday` — 盤中資料
 
-## Historical Endpoints
+#### 取得全部股票列表（用於同步 instruments）
+```python
+result = rest.stock.intraday.tickers(type="EQUITY")
+# result: { 'data': [ {'symbol', 'name', 'industry'}, ... ] }
+# 共 1568 筆（TWSE + TPEx）
+```
 
-### GET /historical/candles/{symbol}
-取得歷史 K 線（最多 1 年）。
+#### 取得單一股票基本資料
+```python
+result = rest.stock.intraday.ticker(symbol="2330")
+# {
+#   'symbol': '2330', 'name': '台積電',
+#   'industry': '24', 'securityType': '01',
+#   'exchange': 'TWSE', 'market': 'TSE',
+#   'referencePrice': 2230, 'limitUpPrice': 2450, 'limitDownPrice': 2010,
+#   'canDayTrade': True, 'canBuyDayTrade': True,
+#   'isAttention': False, 'isDisposition': False,
+#   'boardLot': 1000, 'tradingCurrency': 'TWD',
+#   'previousClose': 2230
+# }
+```
 
-Request params:
-- `from`, `to`: `yyyy-MM-dd`
-- `timeframe`: `1`/`5`/`10`/`15`/`30`/`60`/`D`/`W`/`M`
-- `adjusted`: `true`/`false`（還原股價）
-- `fields`: `open,high,low,close,volume,turnover,change`
-- `sort`: `desc`（預設）/ `asc`
+#### 取得即時報價
+```python
+result = rest.stock.intraday.quote(symbol="2330")
+# {
+#   'symbol': '2330', 'name': '台積電',
+#   'referencePrice': 2230, 'previousClose': 2230,
+#   'openPrice': 2245, 'highPrice': 2260, 'lowPrice': 2225,
+#   'closePrice': 2255, 'lastPrice': 2255, 'lastSize': 3821, 'avgPrice': 2243.86,
+#   'change': 25, 'changePercent': 1.12, 'amplitude': 1.57,
+#   'bids': [{'price': 2255, 'size': 756}, ...],   # 五檔委買
+#   'asks': [{'price': 2260, 'size': 397}, ...],   # 五檔委賣
+#   'total': {'tradeValue': ..., 'tradeVolume': 24324, 'transaction': 6384, ...},
+#   'isClose': True
+# }
+```
 
-Response `data[]`:
-- `date`
-- `open`, `high`, `low`, `close`
-- `volume`（張）
-- `turnover`（成交額）
-- `change`（漲跌）
+#### 取得盤中K線
+```python
+result = rest.stock.intraday.candles(symbol="2330", timeframe="1")
+# timeframe: "1" / "5" / "10" / "15" / "30" / "60"
+# result['data']: [{'open', 'high', 'low', 'close', 'volume', 'average'}, ...]
+```
 
-### GET /historical/stats/{symbol}
-取得近 52 週股價數據。
+---
+
+### `rest.stock.historical` — 歷史資料
+
+#### 取得歷史K線
+```python
+result = rest.stock.historical.candles(**{
+    "symbol": "2330",
+    "from": "2026-01-01",
+    "to": "2026-05-23",
+    "timeframe": "D",          # D / W / M
+    "fields": "open,high,low,close,volume,turnover,change",
+})
+# result['data']: [
+#   {'date': '2026-05-22', 'open': 2245, 'high': 2260,
+#    'low': 2225, 'close': 2255, 'volume': 26823133,
+#    'turnover': 60188140377, 'change': 25},
+#   ...
+# ]
+# sort 預設 'desc'（最新優先）
+```
+
+---
 
 ## 注意事項
-- volume 單位：整股為「張」，盤中零股為「股」，指數為「成交金額」
-- 歷史 K 線最多查 1 年，超過需分批查詢
-- WebSocket 即時推送另有獨立文件（待補）
+
+- `sdk.exchange_realtime_token()` **不傳任何參數**
+- REST client 為**同步 API**，設計供 ARQ Worker 呼叫；在 FastAPI async context 需用 `asyncio.to_thread()`
+- Token 有效期未知，Worker 設計需考慮重新連線機制
+- `volume` 單位：歷史K線為股（shares），盤中視 type 而定
+- 歷史K線最多查 1 年，超過需分批查詢
+- WebSocket 即時推送走 `fubon_neo.adapter.WebSocketStockClientWrapper`（Step 7 待實作）
