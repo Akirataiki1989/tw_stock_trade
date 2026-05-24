@@ -233,3 +233,19 @@ INDEX: (user_id, created_at DESC)
 | created_at | TIMESTAMPTZ | |
 
 UNIQUE: (user_id, date)
+
+---
+
+## trading.watchlist
+
+用戶股票關注清單。ARQ Worker 以 `holdings UNION watchlist` 決定 quote 同步範圍。
+
+| 欄位 | 型別 | 說明 |
+|------|------|------|
+| id | BIGSERIAL PK | |
+| user_id | UUID FK→public.users ON DELETE CASCADE | |
+| symbol | VARCHAR(10) FK→market.instruments | 關注股票代號 |
+| added_at | TIMESTAMPTZ | server_default=now() |
+
+UNIQUE: (user_id, symbol)
+INDEX: idx_watchlist_user ON (user_id)

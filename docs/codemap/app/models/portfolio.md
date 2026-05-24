@@ -11,6 +11,7 @@
 | `Trade` | `trading.trades` | 每筆買賣紀錄 |
 | `AiDecision` | `trading.ai_decisions` | LangGraph 決策快照 |
 | `DailyPerformance` | `trading.daily_performance` | 每日績效紀錄 |
+| `Watchlist` | `trading.watchlist` | 用戶股票關注清單；UNIQUE(user_id, symbol) |
 
 > FK / UNIQUE / INDEX / GENERATED 欄位規格 → [`schema/orm.md`](../../../schema/orm.md)
 

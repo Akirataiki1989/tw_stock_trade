@@ -19,6 +19,7 @@
 | `Trade` | `app/models/portfolio.py` | `trading.trades` | BIGSERIAL | 交易紀錄 |
 | `AiDecision` | `app/models/portfolio.py` | `trading.ai_decisions` | BIGSERIAL | LangGraph 決策快照 |
 | `DailyPerformance` | `app/models/portfolio.py` | `trading.daily_performance` | BIGSERIAL | UNIQUE(user_id, date) |
+| `Watchlist` | `app/models/portfolio.py` | `trading.watchlist` | BIGSERIAL | UNIQUE(user_id, symbol)；關注清單 |
 
 ---
 
@@ -35,11 +36,15 @@ public.users (id: UUID PK)
     │
     ├──< trading.ai_decisions.user_id
     │
-    └──< trading.daily_performance.user_id  [UNIQUE(user_id, date)]
+    ├──< trading.daily_performance.user_id  [UNIQUE(user_id, date)]
+    │
+    └──< trading.watchlist.user_id            [UNIQUE(user_id, symbol)]
 
 market.instruments (symbol: VARCHAR PK)
     │
-    └──1:1 market.market_quotes.symbol  [symbol 同時為 PK + FK]
+    ├──1:1 market.market_quotes.symbol  [symbol 同時為 PK + FK]
+    │
+    └──< trading.watchlist.symbol
 ```
 
 所有 `trading.*` → `public.users` 的 FK 均設定 `ondelete="CASCADE"`（刪用戶自動清除所有交易資料）。
@@ -97,6 +102,7 @@ ForeignKey("market.instruments.symbol")
 | `trading.trades` | `idx_trades_user_symbol` | (user_id, symbol) | 查某用戶某股票交易 |
 | `trading.trades` | `idx_trades_created_at` | (created_at DESC) | 按時間排序交易紀錄 |
 | `trading.ai_decisions` | `idx_ai_decisions_user` | (user_id, created_at DESC) | 查某用戶AI決策歷史 |
+| `trading.watchlist` | `idx_watchlist_user` | (user_id) | 加速按用戶查詢關注清單 |
 
 ---
 
