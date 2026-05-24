@@ -12,7 +12,7 @@
 | `app/models/base.py` | [base.md](app/models/base.md) | `Base`（DeclarativeBase），所有 model 的基底 |
 | `app/models/user.py` | [user.md](app/models/user.md) | `User`，`public.users`，fastapi-users 管理 |
 | `app/models/market.py` | [market.md](app/models/market.md) | `Instrument` / `MarketQuote` / `IntradayCandle` / `HistoricalCandle` |
-| `app/models/portfolio.py` | [portfolio.md](app/models/portfolio.md) | `Portfolio` / `Holding` / `Trade` / `AiDecision` / `DailyPerformance` |
+| `app/models/portfolio.py` | [portfolio.md](app/models/portfolio.md) | `Portfolio` / `Holding` / `Trade` / `AiDecision` / `DailyPerformance` / `Watchlist` |
 | `app/main.py` | — | FastAPI 進入點，lifespan + auth / users router 掛載 |
 | `app/users.py` | — | UserManager、JWTStrategy、auth_backend、fastapi_users、current_active_user |
 | `app/schemas/user.py` | — | UserRead / UserCreate / UserUpdate（fastapi-users schemas） |
@@ -21,6 +21,7 @@
 | `app/schemas/ai.py` | — | AnalyzeRequest / AnalyzeResponse / AiDecisionRead |
 | `app/services/portfolio.py` | — | Portfolio / Holding / Trade / Performance 查詢；stats 聚合計算 |
 | `app/services/market.py` | — | Quote / Candle 查詢（自動路由歷史/盤中）；Instrument 搜尋 |
+| `app/services/fbs.py` | [fbs.md](app/services/fbs.md) | `FbsClient` singleton：connect/disconnect/is_connected；sync_instruments/quote/intraday_candles/historical_candles；fetch_quote/candles |
 | `app/api/portfolio.py` | — | GET /portfolio, /holdings, /trades, /performance, /stats；POST /portfolio/init |
 | `app/api/market.py` | — | GET /market/quote/{symbol}, /candles/{symbol}, /search |
 
@@ -30,10 +31,11 @@
 |-----------|---------|------|
 | `alembic/env.py` | [env.md](alembic/env.md) | async migration 設定，`include_schemas=True` |
 | `alembic/versions/0001_initial_schema.py` | [0001.md](alembic/versions/0001.md) | 初始 migration：建立 3 schema × 9 資料表 |
+| `alembic/versions/0002_add_watchlist.py` | — | migration 0002：新增 `trading.watchlist` 表 |
 
 ## 待建模組（尚無對應 CodeMap）
 
 | 路徑 | 說明 | 前置條件 |
 |------|------|---------|
-| `app/worker.py` | ARQ Worker | FBS SDK |
+| `app/worker.py` | ARQ Worker | ✅ FBS SDK |
 | `app/agents/` | LangGraph Agent | ARQ Worker |

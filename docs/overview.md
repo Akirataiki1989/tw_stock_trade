@@ -14,7 +14,7 @@
 | ✅ | fastapi-users 認證 | `app/main.py`, `app/users.py`, `app/schemas/user.py` |
 | ✅ | Pydantic Schemas | `app/schemas/portfolio.py` / `market.py` / `ai.py` |
 | ✅ | portfolio / market API | `app/api/`, `app/services/`，6 個 endpoint |
-| 🔧 | FBS SDK 接入 | fubon_neo 2.2.8 安裝完成，API 驗證通過，`app/services/fbs.py` 待實作 |
+| ✅ | FBS SDK 接入 | `app/services/fbs.py` 實作完成：FbsClient singleton、sync_* / fetch_* 方法；`trading.watchlist` 表（migration 0002） |
 | ⏳ | ARQ Worker | 待 FBS SDK |
 | ⏳ | LangGraph Agent | 待 ARQ Worker |
 | ⏳ | WebSocket 推送 | 待 market API + LangGraph |
@@ -31,7 +31,7 @@
 | `app/models/base.py` | `Base`（DeclarativeBase），所有 model 的基底 |
 | `app/models/user.py` | `User`，`public.users`，fastapi-users 管理 |
 | `app/models/market.py` | `Instrument` / `MarketQuote` / `IntradayCandle` / `HistoricalCandle` |
-| `app/models/portfolio.py` | `Portfolio` / `Holding` / `Trade` / `AiDecision` / `DailyPerformance` |
+| `app/models/portfolio.py` | `Portfolio` / `Holding` / `Trade` / `AiDecision` / `DailyPerformance` / `Watchlist` |
 | `app/main.py` | FastAPI 進入點，lifespan + router 掛載 |
 | `app/users.py` | UserManager、JWTStrategy、auth_backend、fastapi_users 實例 |
 | `app/schemas/user.py` | UserRead / UserCreate / UserUpdate Pydantic schemas |
@@ -40,6 +40,8 @@
 | `app/schemas/ai.py` | AnalyzeRequest / AnalyzeResponse / AiDecisionRead |
 | `app/services/portfolio.py` | Portfolio / Holding / Trade / Performance 查詢，stats 計算 |
 | `app/services/market.py` | Quote / Candle 查詢，Instrument 搜尋 |
+| `app/services/fbs.py` | FbsClient singleton：connect/disconnect、sync_instruments/quote/candles、fetch_quote/candles |
+| `alembic/versions/0002_add_watchlist.py` | 新增 `trading.watchlist` 表 migration |
 | `app/api/portfolio.py` | GET /portfolio, /holdings, /trades, /performance, /stats；POST /portfolio/init |
 | `app/api/market.py` | GET /market/quote/{symbol}, /candles/{symbol}, /search |
 | `alembic/env.py` | async migration 設定，`include_schemas=True` |

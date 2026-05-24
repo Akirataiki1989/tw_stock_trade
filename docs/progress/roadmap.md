@@ -1,6 +1,6 @@
 # 開發路線圖
 
-> 最後更新：2026-05-23
+> 最後更新：2026-05-24
 
 ## 任務依賴圖
 
@@ -99,7 +99,7 @@
 
 - [x] 安裝 FBS SDK（fubon_neo 2.2.8，whl 安裝）
 - [x] 補充 `docs/fbs_api.md`（實際 SDK 呼叫範例）
-- [ ] 實作 `app/services/fbs.py`（連線、ticker 同步、quote 拉取、candles 拉取）
+- [x] 實作 `app/services/fbs.py`（連線、ticker 同步、quote 拉取、candles 拉取）
 
 ---
 
