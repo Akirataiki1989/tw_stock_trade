@@ -145,3 +145,29 @@ async def test_sync_quote_other_exception_propagates(client):
         await client.sync_quote(mock_db, "2330")
 
 
+# ── sync_intraday_candles ────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_sync_intraday_candles_returns_count(client):
+    """回傳今日全部 K 棒數量，不重複插入已存在的資料。"""
+    from unittest.mock import AsyncMock, patch
+
+    fake_data = {
+        "data": [
+            {"time": "2026-05-24T09:00:00+08:00", "open": 100, "high": 105,
+             "low": 99, "close": 103, "volume": 500, "average": 102.0},
+            {"time": "2026-05-24T09:01:00+08:00", "open": 103, "high": 106,
+             "low": 102, "close": 105, "volume": 300, "average": 104.0},
+        ]
+    }
+    mock_db = AsyncMock()
+
+    with patch("app.services.fbs.asyncio.to_thread", new=AsyncMock(return_value=fake_data)):
+        count = await client.sync_intraday_candles(mock_db, "2330", "1")
+
+    assert count == 2
+    mock_db.execute.assert_called_once()
+    mock_db.commit.assert_called_once()
+
+
+

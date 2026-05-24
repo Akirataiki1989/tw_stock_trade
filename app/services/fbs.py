@@ -160,6 +160,50 @@ class FbsClient:
         await db.commit()
         return True
 
+    async def sync_intraday_candles(
+        self, db: AsyncSession, symbol: str, timeframe: str
+    ) -> int:
+        """從 FBS 拉取今日盤中 K 棒，upsert 到 market.intraday_candles。
+
+        使用 ON CONFLICT DO NOTHING：已存在的 K 棒不覆蓋，新的才寫入。
+
+        Returns:
+            嘗試插入的筆數（含已存在的，實際新增筆數可能更少）。
+        """
+        raw: dict = await asyncio.to_thread(
+            self._rest.stock.intraday.candles, symbol=symbol, timeframe=timeframe
+        )
+        rows: list[dict] = raw.get("data", [])
+        if not rows:
+            return 0
+
+        # ⚠️ "time" 欄位名稱請依 Step 1 實際驗證結果調整
+        values = [
+            {
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "ts": datetime.fromisoformat(r["time"]),
+                "open": r.get("open"),
+                "high": r.get("high"),
+                "low": r.get("low"),
+                "close": r.get("close"),
+                "volume": r.get("volume"),
+                "average": r.get("average"),
+            }
+            for r in rows
+            if r.get("time")  # 跳過無 timestamp 的資料
+        ]
+        if not values:
+            return 0
+
+        stmt = pg_insert(IntradayCandle).values(values)
+        stmt = stmt.on_conflict_do_nothing()
+        await db.execute(stmt)
+        await db.commit()
+        logger.debug("sync_intraday_candles: %s tf=%s, %d rows", symbol, timeframe, len(values))
+        return len(values)
+
+
 
 
 
