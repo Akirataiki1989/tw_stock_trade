@@ -170,4 +170,50 @@ async def test_sync_intraday_candles_returns_count(client):
     mock_db.commit.assert_called_once()
 
 
+# ── sync_historical_candles ──────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_sync_historical_candles_returns_count(client):
+    """回傳正確筆數，並以 ON CONFLICT DO UPDATE 覆蓋舊資料。"""
+    from datetime import date
+    from unittest.mock import AsyncMock, patch
+
+    fake_data = {
+        "data": [
+            {"date": "2026-05-22", "open": 2245, "high": 2260, "low": 2225,
+             "close": 2255, "volume": 26823133, "turnover": 60188140377, "change": 25},
+            {"date": "2026-05-21", "open": 2210, "high": 2240, "low": 2205,
+             "close": 2230, "volume": 20000000, "turnover": 44600000000, "change": -10},
+        ]
+    }
+    mock_db = AsyncMock()
+
+    with patch("app.services.fbs.asyncio.to_thread", new=AsyncMock(return_value=fake_data)):
+        count = await client.sync_historical_candles(
+            mock_db, "2330", "D",
+            date(2026, 5, 21), date(2026, 5, 22),
+        )
+
+    assert count == 2
+    mock_db.execute.assert_called_once()
+    mock_db.commit.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_sync_historical_candles_empty(client):
+    """data 為空時回傳 0，不呼叫 db.execute。"""
+    from datetime import date
+    from unittest.mock import AsyncMock, patch
+
+    mock_db = AsyncMock()
+    with patch("app.services.fbs.asyncio.to_thread", new=AsyncMock(return_value={"data": []})):
+        count = await client.sync_historical_candles(
+            mock_db, "2330", "D", date(2026, 5, 1), date(2026, 5, 22)
+        )
+
+    assert count == 0
+    mock_db.execute.assert_not_called()
+
+
+
 

@@ -203,6 +203,68 @@ class FbsClient:
         logger.debug("sync_intraday_candles: %s tf=%s, %d rows", symbol, timeframe, len(values))
         return len(values)
 
+    async def sync_historical_candles(
+        self,
+        db: AsyncSession,
+        symbol: str,
+        timeframe: str,
+        from_date: date,
+        to_date: date,
+    ) -> int:
+        """從 FBS 拉取歷史 K 棒，upsert 到 market.historical_candles。
+
+        使用 ON CONFLICT DO UPDATE：補資料時覆蓋，確保資料正確性。
+
+        Returns:
+            寫入筆數。
+        """
+        raw: dict = await asyncio.to_thread(
+            self._rest.stock.historical.candles,
+            **{
+                "symbol": symbol,
+                "from": from_date.isoformat(),
+                "to": to_date.isoformat(),
+                "timeframe": timeframe,
+                "fields": "open,high,low,close,volume,turnover,change",
+            },
+        )
+        rows: list[dict] = raw.get("data", [])
+        if not rows:
+            return 0
+
+        values = [
+            {
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "date": date.fromisoformat(r["date"]),
+                "open": r.get("open"),
+                "high": r.get("high"),
+                "low": r.get("low"),
+                "close": r.get("close"),
+                "volume": r.get("volume"),
+                "turnover": r.get("turnover"),
+                "change": r.get("change"),
+            }
+            for r in rows
+        ]
+
+        stmt = pg_insert(HistoricalCandle).values(values)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["symbol", "timeframe", "date"],
+            set_={
+                col: getattr(stmt.excluded, col)
+                for col in ["open", "high", "low", "close", "volume", "turnover", "change"]
+            },
+        )
+        await db.execute(stmt)
+        await db.commit()
+        logger.info(
+            "sync_historical_candles: %s tf=%s %s~%s, %d rows",
+            symbol, timeframe, from_date, to_date, len(values),
+        )
+        return len(values)
+
+
 
 
 
