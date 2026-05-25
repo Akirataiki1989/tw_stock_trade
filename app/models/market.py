@@ -103,3 +103,88 @@ class HistoricalCandle(Base):
     volume: Mapped[Optional[int]] = mapped_column(BigInteger)
     turnover: Mapped[Optional[float]] = mapped_column(Numeric(20, 2))
     change: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
+
+
+class UsMarketDaily(Base):
+    """美股主要指數昨收數據（每日一筆）。"""
+
+    __tablename__ = "us_market_daily"
+    __table_args__ = {"schema": "market"}
+
+    date: Mapped[date] = mapped_column(Date, primary_key=True)
+    # S&P 500
+    sp500_close: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
+    sp500_change: Mapped[Optional[float]] = mapped_column(Numeric(8, 4))   # % e.g. 1.23
+    # NASDAQ
+    nasdaq_close: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
+    nasdaq_change: Mapped[Optional[float]] = mapped_column(Numeric(8, 4))
+    # TSM ADR
+    tsm_adr_close: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
+    tsm_adr_change: Mapped[Optional[float]] = mapped_column(Numeric(8, 4))
+    # 費城半導體 SOX
+    sox_close: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
+    sox_change: Mapped[Optional[float]] = mapped_column(Numeric(8, 4))
+    # 美元指數 DXY（絕對值重要，>100 強勢美元）
+    dxy_close: Mapped[Optional[float]] = mapped_column(Numeric(8, 4))
+    dxy_change: Mapped[Optional[float]] = mapped_column(Numeric(8, 4))
+    # 10 年期公債殖利率（^TNX，Yahoo Finance 回傳單位：%，e.g. 4.5 = 4.5%）
+    us10y_yield: Mapped[Optional[float]] = mapped_column(Numeric(6, 3))
+    us10y_change_bps: Mapped[Optional[float]] = mapped_column(Numeric(6, 1))  # basis points
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class InstitutionalFlow(Base):
+    """TWSE 三大法人買賣超（每日全市場，每支股票一筆）。"""
+
+    __tablename__ = "institutional_flows"
+    __table_args__ = (
+        UniqueConstraint("date", "symbol"),
+        {"schema": "market"},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    symbol: Mapped[str] = mapped_column(String(10), nullable=False)
+    # 外陸資（不含外資自營商）
+    foreign_net: Mapped[Optional[int]] = mapped_column(BigInteger)   # 買賣超股數
+    # 投信
+    trust_buy: Mapped[Optional[int]] = mapped_column(BigInteger)
+    trust_sell: Mapped[Optional[int]] = mapped_column(BigInteger)
+    trust_net: Mapped[Optional[int]] = mapped_column(BigInteger)
+    # 自營商（合計）
+    dealer_net: Mapped[Optional[int]] = mapped_column(BigInteger)
+    # 三大法人合計
+    total_net: Mapped[Optional[int]] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class MarginTrading(Base):
+    """TWSE 融資融券餘額（每日全市場，每支股票一筆）。"""
+
+    __tablename__ = "margin_trading"
+    __table_args__ = (
+        UniqueConstraint("date", "symbol"),
+        {"schema": "market"},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    symbol: Mapped[str] = mapped_column(String(10), nullable=False)
+    # 融資
+    margin_buy: Mapped[Optional[int]] = mapped_column(BigInteger)
+    margin_sell: Mapped[Optional[int]] = mapped_column(BigInteger)
+    margin_balance_prev: Mapped[Optional[int]] = mapped_column(BigInteger)
+    margin_balance: Mapped[Optional[int]] = mapped_column(BigInteger)  # 今日餘額 ⭐
+    # 融券
+    short_buy: Mapped[Optional[int]] = mapped_column(BigInteger)
+    short_sell: Mapped[Optional[int]] = mapped_column(BigInteger)
+    short_balance_prev: Mapped[Optional[int]] = mapped_column(BigInteger)
+    short_balance: Mapped[Optional[int]] = mapped_column(BigInteger)   # 今日餘額 ⭐
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+

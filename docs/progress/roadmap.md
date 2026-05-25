@@ -1,6 +1,6 @@
 # 開發路線圖
 
-> 最後更新：2026-05-24
+> 最後更新：2026-05-25
 
 ## 任務依賴圖
 
@@ -54,7 +54,8 @@
 | Pydantic Schemas | `app/schemas/portfolio.py`, `market.py`, `ai.py` | Read schemas + PortfolioStats / CandleResponse / AnalyzeRequest |
 | portfolio / market API | `app/api/portfolio.py`, `app/api/market.py`, `app/services/portfolio.py`, `app/services/market.py` | 6 個 REST endpoint，含 portfolio init / stats / candle timeframe 路由 |
 | FBS SDK 接入 | `app/services/fbs.py` | FbsClient singleton、sync_*/fetch_* 方法、isClose probe |
-| ARQ Worker | `app/tasks.py`, `app/worker.py` | 5 個 cron tasks：instruments（08:30）、quotes（每分鐘）、intraday_candles（每 5 分）、historical_candles（14:00）、clear_intraday（14:30）；isClose probe 處理假日 |
+| ARQ Worker | `app/tasks.py`, `app/worker.py` | 8 個 cron tasks：instruments（08:30）、quotes（每分鐘）、intraday_candles（每 5 分）、historical_candles（14:00）、clear_intraday（14:30）、us_market（08:30）、institutional_flows（16:00）、margin_trading（16:05） |
+| 外部數據同步（Step 5.5） | `app/services/external_data.py`、`alembic/versions/0003_add_external_data_tables.py`、`app/models/market.py`、`pyproject.toml` | 整合 yfinance + TWSE T86/MI_MARGN API；新增 `market.us_market_daily`、`institutional_flows`、`margin_trading` 三張表；新增 3 個 cron tasks |
 
 ---
 
@@ -117,8 +118,21 @@
 
 ---
 
+#### Step 5.5：外部數據同步
+**前置條件**：Step 5 ARQ Worker  
+**後置任務**：Step 6 LangGraph Agent  
+
+- [x] 安裝 `yfinance>=0.2.54`
+- [x] 實作 `app/services/external_data.py`（fetch_us_market_data、fetch_twse_institutional、fetch_twse_margin、upsert_* 三個函式、pure parsing functions）
+- [x] 新增 migration 0003（`market.us_market_daily`、`institutional_flows`、`margin_trading`）
+- [x] 新增 ORM models（`UsMarketDaily`、`InstitutionalFlow`、`MarginTrading`）
+- [x] 掛載 3 個 cron tasks：us_market（08:30）、institutional_flows（16:00）、margin_trading（16:05）
+- [x] 撰寫 `tests/test_external_data.py` 單元測試
+
+---
+
 #### Step 6：LangGraph Agent
-**前置條件**：Step 5 ARQ Worker（市場資料來源）、Step 3 portfolio API（交易執行）  
+**前置條件**：Step 5 ARQ Worker（市場資料來源）、Step 5.5 外部數據同步、Step 3 portfolio API（交易執行）  
 **後置任務**：Step 7 WebSocket、前端 AI 功能  
 
 - [ ] `app/agents/` graph 定義（nodes + edges）

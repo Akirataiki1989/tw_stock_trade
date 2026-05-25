@@ -4,6 +4,7 @@
 
 | 版本 | 日期 | 重點摘要 |
 |------|------|---------|
+| [v0.5.5](v0.5.5.md) | 2026-05-25 | Step 5.5 完成：外部數據同步（yfinance + TWSE T86/MI_MARGN API）、3 個新表（us_market_daily、institutional_flows、margin_trading）、3 個 cron tasks（08:30/16:00/16:05） |
 | [v0.5.0](v0.5.0.md) | 2026-05-24 | Step 4 完成：FbsClient（FBS SDK 封裝）、trading.watchlist 表、Python 3.12 鎖定 |
 | [v0.1.0](v0.1.0.md) | 2026-05-18 | 初始架構：DB schema（3 層 9 表）、SQLAlchemy models（GENERATED ALWAYS AS）、pydantic-settings config、Alembic async migration |
 
@@ -17,4 +18,4 @@
 
 ## 下一版預計（v0.6.0）
 
-待 ARQ Worker（Step 5）完成後發布。
+待 LangGraph Agent（Step 6）完成後發布。

@@ -23,6 +23,7 @@ dependencies = [
     "aiohttp>=3.13.5",
     "python-dotenv>=1.0.0",
     "fubon-neo",
+    "yfinance>=0.2.54",
 ]
 
 [dependency-groups]

@@ -12,6 +12,14 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.market import HistoricalCandle
+from app.services.external_data import (
+    fetch_twse_institutional,
+    fetch_twse_margin,
+    fetch_us_market_data,
+    upsert_institutional_flows,
+    upsert_margin_trading,
+    upsert_us_market_daily,
+)
 from app.services.fbs import fbs_client
 
 # ── 自訂 TRACE 層級（level=5，低於 DEBUG=10）────────────────────────────────
@@ -231,6 +239,70 @@ async def task_clear_intraday_candles(ctx: dict) -> None:
         await db.execute(text("DELETE FROM market.intraday_candles"))
         await db.commit()
     logger.info("task_clear_intraday_candles: table cleared")
+
+
+async def task_sync_us_market(ctx: dict) -> None:
+    """每日 08:30：同步美股主要指數昨收數據（開盤前備妥，LangGraph fetch_context 節點讀取）。"""
+    t0 = _time.monotonic()
+    logger.info("task_sync_us_market: started")
+    try:
+        data = await fetch_us_market_data()
+        trade_date = datetime.now(_TZ).date()
+        async with ctx["db_factory"]() as db:
+            await upsert_us_market_daily(db, data, trade_date)
+        elapsed = _time.monotonic() - t0
+        logger.info(
+            "task_sync_us_market: done in %.1fs, sp500=%.2f(%+.2f%%)",
+            elapsed,
+            data.get("sp500", {}).get("close") or 0,
+            data.get("sp500", {}).get("change") or 0,
+        )
+    except Exception as e:
+        logger.error("task_sync_us_market: unexpected error=%s", e)
+        raise
+
+
+async def task_sync_institutional_flows(ctx: dict) -> None:
+    """每日 16:00：同步 TWSE 三大法人買賣超（全市場，~1000 支股票）。"""
+    t0 = _time.monotonic()
+    logger.info("task_sync_institutional_flows: started")
+    try:
+        trade_date, records = await fetch_twse_institutional()
+        if not records:
+            logger.info("task_sync_institutional_flows: 無資料（非交易日或 API 異常），skipped")
+            return
+        async with ctx["db_factory"]() as db:
+            n = await upsert_institutional_flows(db, records, trade_date)
+        elapsed = _time.monotonic() - t0
+        logger.info(
+            "task_sync_institutional_flows: done in %.1fs, date=%s, wrote=%d",
+            elapsed, trade_date, n,
+        )
+    except Exception as e:
+        logger.error("task_sync_institutional_flows: unexpected error=%s", e)
+        raise
+
+
+async def task_sync_margin_trading(ctx: dict) -> None:
+    """每日 16:05：同步 TWSE 融資融券餘額（全市場，~700 支股票）。"""
+    t0 = _time.monotonic()
+    logger.info("task_sync_margin_trading: started")
+    try:
+        trade_date, records = await fetch_twse_margin()
+        if not records:
+            logger.info("task_sync_margin_trading: 無資料（非交易日或 API 異常），skipped")
+            return
+        async with ctx["db_factory"]() as db:
+            n = await upsert_margin_trading(db, records, trade_date)
+        elapsed = _time.monotonic() - t0
+        logger.info(
+            "task_sync_margin_trading: done in %.1fs, date=%s, wrote=%d",
+            elapsed, trade_date, n,
+        )
+    except Exception as e:
+        logger.error("task_sync_margin_trading: unexpected error=%s", e)
+        raise
+
 
 
 

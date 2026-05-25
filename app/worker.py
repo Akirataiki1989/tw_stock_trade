@@ -14,9 +14,12 @@ from app.services.fbs import fbs_client
 from app.tasks import (
     task_clear_intraday_candles,
     task_sync_historical_candles,
+    task_sync_institutional_flows,
     task_sync_instruments,
     task_sync_intraday_candles,
+    task_sync_margin_trading,
     task_sync_quotes,
+    task_sync_us_market,
 )
 
 logger = logging.getLogger(__name__)
@@ -50,11 +53,14 @@ class WorkerSettings:
     on_startup = startup
     on_shutdown = shutdown
     cron_jobs = [
-        cron(task_sync_instruments, hour=8, minute=30, run_at_startup=False),
-        cron(task_sync_quotes, minute=set(range(60))),
-        cron(task_sync_intraday_candles, minute={0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55}),
-        cron(task_sync_historical_candles, hour=14, minute=0, run_at_startup=False),
-        cron(task_clear_intraday_candles, hour=14, minute=30, run_at_startup=False),
+        cron(task_sync_instruments,          hour=8,  minute=30, run_at_startup=False),
+        cron(task_sync_us_market,            hour=8,  minute=30, run_at_startup=False),
+        cron(task_sync_quotes,               minute=set(range(60))),
+        cron(task_sync_intraday_candles,     minute={0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55}),
+        cron(task_sync_historical_candles,   hour=14, minute=0,  run_at_startup=False),
+        cron(task_clear_intraday_candles,    hour=14, minute=30, run_at_startup=False),
+        cron(task_sync_institutional_flows,  hour=16, minute=0,  run_at_startup=False),
+        cron(task_sync_margin_trading,       hour=16, minute=5,  run_at_startup=False),
     ]
     max_jobs = 10
     job_timeout = 300  # 5 分鐘，避免 task 卡住
