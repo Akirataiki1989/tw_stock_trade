@@ -62,12 +62,13 @@ async def startup(ctx: dict) -> None:
 async def shutdown(ctx: dict) -> None:
     """Worker 關閉時：清理所有資源。"""
     fbs_client.disconnect()
-    checkpointer = ctx.get("checkpointer")
-    if checkpointer and hasattr(checkpointer, "_cm"):
-        try:
-            await checkpointer._cm.__aexit__(None, None, None)
-        except Exception:
-            pass
+    for key in ("checkpointer", "store"):
+        obj = ctx.get(key)
+        if obj and hasattr(obj, "_cm"):
+            try:
+                await obj._cm.__aexit__(None, None, None)
+            except Exception:
+                pass
     if "engine" in ctx:
         await ctx["engine"].dispose()
     logger.info("Worker shutdown complete")

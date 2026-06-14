@@ -69,7 +69,7 @@ async def make_prod_store(pg_url: str, embed_fn) -> Any:
     """Create AsyncPostgresStore with pgvector. Call once at worker startup."""
     from langgraph.store.postgres.aio import AsyncPostgresStore
 
-    store = AsyncPostgresStore(
+    cm = AsyncPostgresStore.from_conn_string(
         pg_url,
         index={
             "dims": 768,              # text-embedding-004 output dimension
@@ -77,7 +77,9 @@ async def make_prod_store(pg_url: str, embed_fn) -> Any:
             "fields": ["situation"],  # only embed the situation description
         },
     )
+    store = await cm.__aenter__()
     await store.setup()
+    store._cm = cm   # keep reference for teardown in shutdown()
     return store
 
 
