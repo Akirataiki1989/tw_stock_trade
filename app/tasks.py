@@ -116,6 +116,24 @@ async def task_sync_quotes(ctx: dict) -> None:
                 if result:
                     logger.debug("task_sync_quotes: symbol=%s ok", symbol)
                     ok += 1
+                    # Publish to Redis pub/sub for WebSocket clients
+                    if ctx.get("redis"):
+                        from app.models.market import MarketQuote
+                        from sqlalchemy import select as _sel
+                        from app.services.pubsub import publish_quote
+                        quote_row = await db.scalar(
+                            _sel(MarketQuote).where(MarketQuote.symbol == symbol)
+                        )
+                        if quote_row:
+                            await publish_quote(ctx["redis"], symbol, {
+                                "last_price": float(quote_row.last_price or 0),
+                                "change": float(quote_row.change or 0),
+                                "change_pct": float(quote_row.change_pct or 0),
+                                "last_size": quote_row.last_size or 0,
+                                "is_limit_up": bool(quote_row.is_limit_up),
+                                "is_limit_down": bool(quote_row.is_limit_down),
+                                "ts": quote_row.fetched_at.isoformat() if quote_row.fetched_at else None,
+                            })
                 else:
                     logger.warning("task_sync_quotes: symbol=%s failed (429 or empty)", symbol)
                     fail += 1
@@ -382,6 +400,7 @@ async def task_run_ai_on_demand(ctx: dict, user_id: str, symbol: str, session_id
     import uuid as _uuid
     from app.agent.graph import build_graph
     from app.agent.state import DebateState
+    from app.services.pubsub import publish_ai_event
 
     now = datetime.now(_TZ)
     thread_id = f"ai_od_{user_id}_{symbol}_{now.strftime('%Y%m%d_%H%M%S')}"
@@ -393,6 +412,10 @@ async def task_run_ai_on_demand(ctx: dict, user_id: str, symbol: str, session_id
     )
 
     try:
+        await publish_ai_event(ctx.get("redis"), session_id, {
+            "event": "started",
+            "symbol": symbol,
+        })
         await graph.ainvoke(
             {
                 "symbol": symbol,
@@ -407,9 +430,17 @@ async def task_run_ai_on_demand(ctx: dict, user_id: str, symbol: str, session_id
             },
             {"configurable": {"thread_id": thread_id}},
         )
+        await publish_ai_event(ctx.get("redis"), session_id, {
+            "event": "completed",
+            "symbol": symbol,
+        })
         logger.info("task_run_ai_on_demand: user=%s symbol=%s session=%s done",
                     user_id[:8], symbol, session_id[:8])
     except Exception as e:
+        await publish_ai_event(ctx.get("redis"), session_id, {
+            "event": "failed",
+            "error": str(e),
+        })
         logger.error("task_run_ai_on_demand: user=%s symbol=%s error=%s",
                      user_id[:8], symbol, e)
         raise

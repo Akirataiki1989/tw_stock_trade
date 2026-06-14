@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from app.api.ai import router as ai_router
 from app.api.market import router as market_router
 from app.api.portfolio import router as portfolio_router
+from app.api.ws import router as ws_router
 from app.core.config import settings
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.users import auth_backend, fastapi_users
@@ -45,6 +46,7 @@ app.include_router(
 app.include_router(portfolio_router)
 app.include_router(market_router)
 app.include_router(ai_router)
+app.include_router(ws_router)
 
 
 @app.get("/health")

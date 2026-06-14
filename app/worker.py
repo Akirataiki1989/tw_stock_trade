@@ -57,6 +57,10 @@ async def startup(ctx: dict) -> None:
     )
     ctx["store"] = await make_prod_store(pg_url, embeddings.aembed_documents)
     logger.info("Worker startup: AsyncPostgresStore (pgvector) ready")
+
+    import redis.asyncio as aioredis
+    ctx["redis"] = await aioredis.from_url(str(settings.redis_url), decode_responses=True)
+    logger.info("Worker startup: Redis pub/sub client ready")
     logger.info("Worker startup complete")
 
 
@@ -72,6 +76,8 @@ async def shutdown(ctx: dict) -> None:
                 pass
     if "engine" in ctx:
         await ctx["engine"].dispose()
+    if "redis" in ctx:
+        await ctx["redis"].aclose()
     logger.info("Worker shutdown complete")
 
 
