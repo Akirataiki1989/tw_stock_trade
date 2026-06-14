@@ -304,7 +304,170 @@ async def task_sync_margin_trading(ctx: dict) -> None:
         raise
 
 
+async def get_ai_interval(db: AsyncSession) -> int:
+    """Read ai_interval_minutes from trading.settings. Default: 30."""
+    val = await db.scalar(
+        text("SELECT value FROM trading.settings WHERE key = 'ai_interval_minutes'")
+    )
+    return int(val) if val else 30
 
 
+async def task_maybe_run_ai(ctx: dict) -> None:
+    """每分鐘觸發：依 ai_interval_minutes 設定決定是否執行 AI 分析。"""
+    import uuid as _uuid
+    from app.agent.graph import build_graph
+    from app.models.portfolio import Holding, Portfolio
+    from sqlalchemy import select as _select
+
+    now = datetime.now(_TZ)
+    if not is_trading_hours():
+        return
+
+    async with ctx["db_factory"]() as db:
+        interval = await get_ai_interval(db)
+
+    if now.minute % interval != 0:
+        return
+
+    logger.info("task_maybe_run_ai: interval=%d min, starting at %s", interval, now.strftime("%H:%M"))
+    t0 = _time.monotonic()
+
+    graph = build_graph(
+        db_factory=ctx["db_factory"],
+        checkpointer=ctx["checkpointer"],
+        store=ctx["store"],
+    )
+
+    async with ctx["db_factory"]() as db:
+        portfolios = (await db.execute(_select(Portfolio))).scalars().all()
+
+    ok = fail = 0
+    for port in portfolios:
+        async with ctx["db_factory"]() as db:
+            holdings = (await db.execute(
+                _select(Holding).where(Holding.user_id == port.user_id)
+            )).scalars().all()
+
+        for h in holdings:
+            session_id = str(_uuid.uuid4())
+            thread_id = f"ai_{port.user_id}_{h.symbol}_{now.strftime('%Y%m%d_%H%M')}"
+            try:
+                from app.agent.state import DebateState
+                await graph.ainvoke(
+                    {
+                        "symbol": h.symbol,
+                        "user_id": str(port.user_id),
+                        "session_id": session_id,
+                        "analyst_reports": [],
+                        "debate_state": DebateState(bull_history="", bear_history="",
+                                                    history="", current_response="", count=0),
+                        "final_decision": None,
+                        "executed": False,
+                        "execution_note": "",
+                    },
+                    {"configurable": {"thread_id": thread_id}},
+                )
+                ok += 1
+            except Exception as e:
+                fail += 1
+                logger.error("task_maybe_run_ai: user=%s symbol=%s error=%s",
+                             str(port.user_id)[:8], h.symbol, e)
+
+    logger.info("task_maybe_run_ai: done in %.1fs ok=%d fail=%d",
+                _time.monotonic() - t0, ok, fail)
+
+
+async def task_update_trade_outcomes(ctx: dict) -> None:
+    """每日 17:00：將 7 天前的 AI 決策損益結果回填至 Store 記憶。"""
+    from datetime import timedelta
+    from app.agent.memory import NAMESPACE
+
+    store = ctx["store"]
+    target_date = datetime.now(_TZ).date() - timedelta(days=7)
+    logger.info("task_update_trade_outcomes: backfilling outcomes for %s", target_date)
+
+    async with ctx["db_factory"]() as db:
+        rows = (await db.execute(text("""
+            SELECT session_id, decisions, created_at
+            FROM trading.ai_decisions
+            WHERE DATE(created_at AT TIME ZONE 'Asia/Taipei') = :d
+        """), {"d": target_date})).fetchall()
+
+    updated = 0
+    for row in rows:
+        session_id = str(row[0])
+        decisions = row[1] or {}
+        for symbol, decision in decisions.items():
+            entry_price = decision.get("target_price", 0)
+            action = decision.get("action", "HOLD")
+            if not entry_price or action == "HOLD":
+                continue
+            async with ctx["db_factory"]() as db:
+                current = await db.scalar(text(
+                    "SELECT last_price FROM market.market_quotes WHERE symbol=:s"
+                ), {"s": symbol})
+            if not current:
+                continue
+            raw_return = (float(current) - entry_price) / entry_price
+            outcome = -raw_return if action == "SELL" else raw_return
+
+            all_items = await store.asearch(NAMESPACE, filter={"symbol": symbol}, limit=500)
+            for item in all_items:
+                if session_id in item.key:
+                    await store.aput(NAMESPACE, item.key, {**item.value, "outcome_score": round(outcome, 4)})
+                    updated += 1
+                    break
+
+    logger.info("task_update_trade_outcomes: updated %d store entries", updated)
+
+
+async def task_cleanup_checkpoints(ctx: dict) -> None:
+    """每日 03:00：刪除 checkpoint_ttl_days 天前的 checkpoint 記錄。"""
+    from app.core.config import settings
+    ttl = settings.checkpoint_ttl_days
+    async with ctx["db_factory"]() as db:
+        r = await db.execute(text(
+            f"DELETE FROM checkpoints WHERE thread_ts < NOW() - INTERVAL '{ttl} days'"
+        ))
+        deleted = r.rowcount
+        await db.execute(text("""
+            DELETE FROM checkpoint_blobs
+            WHERE thread_id NOT IN (SELECT thread_id FROM checkpoints)
+        """))
+        await db.execute(text("""
+            DELETE FROM checkpoint_writes
+            WHERE thread_id NOT IN (SELECT thread_id FROM checkpoints)
+        """))
+        await db.commit()
+    logger.info("task_cleanup_checkpoints: deleted %d rows older than %d days", deleted, ttl)
+
+
+async def task_prune_store_memories(ctx: dict) -> None:
+    """每週日 02:00：每個 symbol 只保留 top N 筆記憶（按 outcome_score 排序）。"""
+    from app.core.config import settings
+    from app.agent.memory import NAMESPACE
+
+    store = ctx["store"]
+    async with ctx["db_factory"]() as db:
+        symbols = await get_watch_symbols(db)
+
+    total_deleted = 0
+    for symbol in symbols:
+        try:
+            items = await store.asearch(NAMESPACE, filter={"symbol": symbol}, limit=1000)
+            scored = sorted(
+                [i for i in items if i.value.get("outcome_score") is not None],
+                key=lambda x: x.value["outcome_score"], reverse=True,
+            )
+            unscored = [i for i in items if i.value.get("outcome_score") is None]
+            keep = settings.store_max_per_symbol
+            to_delete = scored[keep:] + unscored[max(0, keep - len(scored)):]
+            for item in to_delete:
+                await store.adelete(NAMESPACE, item.key)
+                total_deleted += 1
+        except Exception as e:
+            logger.error("task_prune_store_memories: symbol=%s error=%s", symbol, e)
+
+    logger.info("task_prune_store_memories: deleted %d memory entries", total_deleted)
 
 
