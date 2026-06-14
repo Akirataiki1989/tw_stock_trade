@@ -28,9 +28,17 @@ logging.Logger.trace = _trace  # level < DEBUG，記錄 SDK raw request + 錯誤
 | `task_sync_intraday_candles(ctx)` | 每 5 分鐘 | 盤中；timeframe="5" |
 | `task_sync_historical_candles(ctx)` | 每日 14:00 | 增量；首次補 2 年；FBS 限 1 年/次拆兩次 |
 | `task_clear_intraday_candles(ctx)` | 每日 14:30 | DELETE FROM market.intraday_candles |
+| `task_sync_us_market(ctx)` | 每日 08:30 | 拉取美股指數昨收 (Step 5.5) |
+| `task_sync_institutional_flows(ctx)` | 每日 16:00 | 拉取三大法人買賣超 (Step 5.5) |
+| `task_sync_margin_trading(ctx)` | 每日 16:05 | 拉取融資融券餘額 (Step 5.5) |
+| `task_maybe_run_ai(ctx)` | 每分鐘 | 檢查 `ai_interval_minutes` 並觸發 LangGraph Agent 決策 |
+| `task_update_trade_outcomes(ctx)` | 每日 17:00 | 更新過去 1/3/5 日決策的 `outcome_score` |
+| `task_cleanup_checkpoints(ctx)` | 每日 03:00 | 刪除過期的 LangGraph checkpoints (短期記憶) |
+| `task_prune_store_memories(ctx)` | 每週日 02:00 | 刪除單一標的過量的向量記憶 (長期記憶) |
 
 ## 依賴
 
 - `app.services.fbs.fbs_client`（全域 singleton）
 - `app.models.market.HistoricalCandle`（歷史 K 增量查詢）
+- `app.agent.graph.build_graph`（執行 AI 決策）
 - `sqlalchemy.text`（UNION 查詢、DELETE）

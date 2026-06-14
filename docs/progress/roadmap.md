@@ -1,6 +1,6 @@
 # 開發路線圖
 
-> 最後更新：2026-05-25
+> 最後更新：2026-06-14
 
 ## 任務依賴圖
 
@@ -157,6 +157,10 @@
 
 - [ ] Synology Task Scheduler 設定 uvicorn 開機自動啟動
 - [ ] Synology Task Scheduler 設定 ARQ Worker 開機自動啟動
+- [ ] Redis Docker 容器設定
+- [ ] Cloudflare Tunnel 連通測試
+- [ ] `.env` 生產環境設定
+ARQ Worker 開機自動啟動
 - [ ] Redis Docker 容器設定
 - [ ] Cloudflare Tunnel 連通測試
 - [ ] `.env` 生產環境設定

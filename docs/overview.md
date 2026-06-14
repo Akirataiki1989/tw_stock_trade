@@ -43,7 +43,12 @@
 | `app/services/market.py` | Quote / Candle 查詢，Instrument 搜尋 |
 | `app/services/fbs.py` | FbsClient singleton：connect/disconnect、sync_instruments/quote/candles、fetch_quote/candles |
 | `app/services/external_data.py` | yfinance + TWSE API fetch/parse/upsert；clean_number()、parse_institutional_row()、parse_margin_row_full() 等純函式 |
-| `app/tasks.py` | 自訂 TRACE 層級、`is_trading_hours()`、`get_watch_symbols()`、5 個 cron task 函式 |
+| `app/agent/state.py` | LangGraph State 定義，含平行節點 reducer |
+| `app/agent/memory.py` | 長短期記憶管理：Checkpointer 與 Vector Store (pgvector) 初始化 |
+| `app/agent/prompts.py` | AI 角色提示詞常數 |
+| `app/agent/nodes.py` | Graph 節點工廠與業務邏輯、熔斷機制 |
+| `app/agent/graph.py` | LangGraph 編排與 LLM 初始化 |
+| `app/tasks.py` | 自訂 TRACE 層級、`is_trading_hours()`、`get_watch_symbols()`、AI 相關 4 個 cron tasks (總計 12 個) |
 | `app/worker.py` | ARQ `WorkerSettings`（redis、cron_jobs、max_jobs=10、job_timeout=300）、`startup`/`shutdown` hooks |
 | `alembic/versions/0002_add_watchlist.py` | 新增 `trading.watchlist` 表 migration |
 | `alembic/versions/0003_add_external_data_tables.py` | migration 0003：新增 `market.us_market_daily`、`institutional_flows`、`margin_trading` |
