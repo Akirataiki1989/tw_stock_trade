@@ -20,7 +20,11 @@ logger = logging.getLogger(__name__)
 async def _get_ws_user(token: str, db: AsyncSession) -> User:
     """Decode JWT token and return active user. Raises WebSocketException on failure."""
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
+        payload = jwt.decode(
+            token, settings.secret_key,
+            algorithms=[settings.jwt_algorithm],
+            audience="fastapi-users:auth",
+        )
         user_id: str | None = payload.get("sub")
         if not user_id:
             raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
