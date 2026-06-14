@@ -1,8 +1,10 @@
 # API 規格
 
-Base URL: `https://<cloudflare-tunnel-domain>/api`
+Base URL: `https://api.guieunuch.cc/api/v1`
 
-所有需要認證的 endpoint 帶 `Authorization: Bearer <JWT>` header。
+- Swagger UI: `https://api.guieunuch.cc/api/v1/docs`
+- Health check: `https://api.guieunuch.cc/health`
+- 所有需要認證的 endpoint 帶 `Authorization: Bearer <JWT>` header。
 
 ---
 
@@ -10,11 +12,11 @@ Base URL: `https://<cloudflare-tunnel-domain>/api`
 
 | Method | Path | 說明 | 認證 |
 |--------|------|------|------|
-| POST | `/auth/register` | 註冊 | 否 |
-| POST | `/auth/jwt/login` | 登入，回傳 JWT | 否 |
-| POST | `/auth/jwt/logout` | 登出 | 是 |
-| GET | `/users/me` | 取得當前用戶資訊 | 是 |
-| PATCH | `/users/me` | 更新用戶資訊 | 是 |
+| POST | `/api/v1/auth/register` | 註冊 | 否 |
+| POST | `/api/v1/auth/jwt/login` | 登入，回傳 JWT（form-urlencoded） | 否 |
+| POST | `/api/v1/auth/jwt/logout` | 登出 | 是 |
+| GET | `/api/v1/users/me` | 取得當前用戶資訊 | 是 |
+| PATCH | `/api/v1/users/me` | 更新用戶資訊 | 是 |
 
 ---
 
@@ -22,12 +24,12 @@ Base URL: `https://<cloudflare-tunnel-domain>/api`
 
 | Method | Path | 說明 |
 |--------|------|------|
-| GET | `/portfolio` | 取得投資組合（現金、總資產） |
-| POST | `/portfolio/init` | 初始化投資組合（設定初始資金） |
-| GET | `/portfolio/holdings` | 取得持倉列表 |
-| GET | `/portfolio/trades` | 取得交易紀錄（支援分頁） |
-| GET | `/portfolio/performance` | 取得每日績效歷史 |
-| GET | `/portfolio/stats` | 取得交易統計（勝率、總損益） |
+| GET | `/api/v1/portfolio` | 取得投資組合（現金、總資產） |
+| POST | `/api/v1/portfolio/init` | 初始化投資組合（設定初始資金） |
+| GET | `/api/v1/portfolio/holdings` | 取得持倉列表 |
+| GET | `/api/v1/portfolio/trades` | 取得交易紀錄（支援分頁） |
+| GET | `/api/v1/portfolio/performance` | 取得每日績效歷史 |
+| GET | `/api/v1/portfolio/stats` | 取得交易統計（勝率、總損益） |
 
 ### GET /portfolio
 ```json
@@ -83,9 +85,9 @@ Base URL: `https://<cloudflare-tunnel-domain>/api`
 
 | Method | Path | 說明 |
 |--------|------|------|
-| GET | `/market/quote/{symbol}` | 取得即時報價 |
-| GET | `/market/candles/{symbol}` | 取得 K 線（盤中或歷史） |
-| GET | `/market/search` | 搜尋股票代碼/名稱 |
+| GET | `/api/v1/market/quote/{symbol}` | 取得即時報價 |
+| GET | `/api/v1/market/candles/{symbol}` | 取得 K 線（盤中或歷史） |
+| GET | `/api/v1/market/search` | 搜尋股票代碼/名稱 |
 
 ### GET /market/quote/2330
 ```json
@@ -131,9 +133,9 @@ Base URL: `https://<cloudflare-tunnel-domain>/api`
 
 | Method | Path | 說明 |
 |--------|------|------|
-| POST | `/ai/analyze` | 觸發 LangGraph Agent 分析（非同步，立即回傳 session_id） |
-| GET | `/ai/decisions` | 取得 AI 決策歷史（?limit=20&symbol=2330） |
-| GET | `/ai/decisions/{session_id}` | 取得單筆 AI 決策詳情 |
+| POST | `/api/v1/ai/analyze` | 觸發 LangGraph Agent 分析（非同步，立即回傳 session_id） |
+| GET | `/api/v1/ai/decisions` | 取得 AI 決策歷史（?limit=20&symbol=2330） |
+| GET | `/api/v1/ai/decisions/{session_id}` | 取得單筆 AI 決策詳情 |
 
 ### POST /ai/analyze
 Request:
@@ -193,7 +195,7 @@ Response（其中 decisions 是 JSONB）:
 ## WebSocket
 
 ### WS /ws/quotes 端點
-- **URL**: `ws://<host>/ws/quotes?token=<JWT>`
+- **URL**: `wss://api.guieunuch.cc/ws/quotes?token=<JWT>`
 - **說明**: 訂閱即時報價推送。
 - **認證**: 透過 `token` query parameter 傳遞 JWT，`audience='fastapi-users:auth'`。
 
@@ -229,7 +231,7 @@ Response（其中 decisions 是 JSONB）:
 ---
 
 ### WS /ws/ai-stream 端點
-- **URL**: `ws://<host>/ws/ai-stream?token=<JWT>&session_id=<UUID>`
+- **URL**: `wss://api.guieunuch.cc/ws/ai-stream?token=<JWT>&session_id=<UUID>`
 - **說明**: 訂閱 AI 分析進度推送，收到終端事件（completed/failed）後會自動關閉連線。
 - **認證**: 透過 `token` query parameter 傳遞 JWT。
 
