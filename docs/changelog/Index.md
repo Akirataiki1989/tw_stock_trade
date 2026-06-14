@@ -4,6 +4,7 @@
 
 | 版本 | 日期 | 重點摘要 |
 |------|------|---------|
+| [v0.7.0](v0.7.0.md) | 2026-06-14 | Step 7 完成：WebSocket 即時推送（/ws/quotes + /ws/ai-stream）、Redis pub/sub 架構、JWT auth via query param |
 | [v0.6.0](v0.6.0.md) | 2026-06-14 | Step 6 完成：LangGraph Agent（多分析師+Bull/Bear辯論+AsyncPostgresSaver/pgvector記憶）、4 個 AI cron tasks |
 | [v0.5.5](v0.5.5.md) | 2026-05-25 | Step 5.5 完成：外部數據同步（yfinance + TWSE T86/MI_MARGN API）、3 個新表（us_market_daily、institutional_flows、margin_trading）、3 個 cron tasks（08:30/16:00/16:05） |
 | [v0.5.0](v0.5.0.md) | 2026-05-24 | Step 4 完成：FbsClient（FBS SDK 封裝）、trading.watchlist 表、Python 3.12 鎖定 |
@@ -17,6 +18,6 @@
 - **minor**（0.x.0）：新增功能模組（每完成一個 roadmap Step）
 - **major**（x.0.0）：重大架構變更
 
-## 下一版預計（v0.7.0）
+## 下一版預計（v0.8.0）
 
-待 WebSocket 推送完成後發布。
+待部署設定完成後發布。

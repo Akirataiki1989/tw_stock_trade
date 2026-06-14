@@ -144,12 +144,12 @@
 
 ---
 
-#### Step 7：WebSocket 推送
+#### Step 7：WebSocket 推送 ✅
 **前置條件**：Step 3 market API、Step 6 LangGraph Agent  
 
-- [ ] `app/api/ws.py`（`WS /ws/quotes`、`WS /ws/ai-stream`）
-- [ ] 即時報價訂閱機制（Redis pub/sub 或 ARQ 推送）
-- [ ] AI 分析進度 stream
+- [x] `app/api/ws.py`（`WS /ws/quotes`、`WS /ws/ai-stream`）
+- [x] 即時報價訂閱機制（Redis pub/sub）
+- [x] AI 分析進度 stream
 
 ---
 

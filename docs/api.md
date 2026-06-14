@@ -192,30 +192,70 @@ Response（其中 decisions 是 JSONB）:
 
 ## WebSocket
 
-| Path | 說明 |
-|------|------|
-| `WS /ws/quotes` | 訂閱即時報價推送 |
-| `WS /ws/ai-stream` | 訂閱 AI 分析進度推送 |
+### WS /ws/quotes 端點
+- **URL**: `ws://<host>/ws/quotes?token=<JWT>`
+- **說明**: 訂閱即時報價推送。
+- **認證**: 透過 `token` query parameter 傳遞 JWT，`audience='fastapi-users:auth'`。
 
-### WS /ws/quotes 訊息格式
+#### Client → Server (訂閱/取消)
+```json
+{
+  "action": "subscribe",
+  "symbols": ["2330", "2454"]
+}
+```
+```json
+{
+  "action": "unsubscribe",
+  "symbols": ["2330"]
+}
+```
+
+#### Server → Client (推送報價)
 ```json
 {
   "type": "quote",
   "symbol": "2330",
-  "last_price": 900.00,
+  "last_price": 900.0,
+  "change": 10.0,
   "change_pct": 1.12,
-  "ts": "2026-05-18T10:30:05+08:00"
+  "volume": 35000,
+  "is_limit_up": false,
+  "is_limit_down": false,
+  "ts": "2026-06-14T10:30:00+08:00"
 }
 ```
 
-### WS /ws/ai-stream 訊息格式
+---
+
+### WS /ws/ai-stream 端點
+- **URL**: `ws://<host>/ws/ai-stream?token=<JWT>&session_id=<UUID>`
+- **說明**: 訂閱 AI 分析進度推送，收到終端事件（completed/failed）後會自動關閉連線。
+- **認證**: 透過 `token` query parameter 傳遞 JWT。
+
+#### Server → Client (分析進度事件)
 ```json
 {
-  "type": "agent_progress",
-  "session_id": "uuid",
-  "agent": "technical_analyst",
-  "status": "completed",
-  "summary": "技術面偏多，建議持有 2330"
+  "type": "ai_event",
+  "session_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "event": "started",
+  "symbol": "2330"
+}
+```
+```json
+{
+  "type": "ai_event",
+  "session_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "event": "completed",
+  "symbol": "2330"
+}
+```
+```json
+{
+  "type": "ai_event",
+  "session_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "event": "failed",
+  "error": "Timeout or model error..."
 }
 ```
 

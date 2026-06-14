@@ -17,8 +17,8 @@
 | ✅ | FBS SDK 接入 | `app/services/fbs.py` 實作完成：FbsClient singleton、sync_* / fetch_* 方法；`trading.watchlist` 表（migration 0002） |
 | ✅ | ARQ Worker | `app/worker.py` (WorkerSettings + startup/shutdown) + `app/tasks.py` (8 個 cron tasks：instruments/quotes/intraday_candles/historical_candles/clear_intraday/us_market/institutional_flows/margin_trading) |
 | ✅ | 外部數據同步（Step 5.5） | yfinance + TWSE T86/MI_MARGN → 3 張新表；3 個 cron tasks（08:30/16:00/16:05）；`app/services/external_data.py` |
-| ⏳ | LangGraph Agent | 待 ARQ Worker |
-| ⏳ | WebSocket 推送 | 待 market API + LangGraph |
+| ✅ | LangGraph Agent | Step 6 完成，含多分析師辯論與記憶 |
+| ✅ | WebSocket 推送 | Step 7 完成，含即時報價與 AI 進度 |
 | ⏳ | Docker Compose | 最終整合 |
 
 ---
@@ -49,6 +49,8 @@
 | `app/agent/nodes.py` | Graph 節點工廠與業務邏輯、熔斷機制 |
 | `app/agent/graph.py` | LangGraph 編排與 LLM 初始化 |
 | `app/api/ai.py` | POST /ai/analyze（觸發分析）、GET /ai/decisions（決策歷史）、GET /ai/decisions/{session_id}（單筆詳情） |
+| `app/api/ws.py` | WS /ws/quotes（即時報價）、WS /ws/ai-stream（AI 進度） |
+| `app/services/pubsub.py` | Redis pub/sub 封裝（publish_quote / publish_ai_event） |
 | `app/tasks.py` | 自訂 TRACE 層級、`is_trading_hours()`、`get_watch_symbols()`、AI 相關 4 個 cron tasks (總計 12 個) |
 | `app/worker.py` | ARQ `WorkerSettings`（redis、cron_jobs、max_jobs=10、job_timeout=300）、`startup`/`shutdown` hooks |
 | `alembic/versions/0002_add_watchlist.py` | 新增 `trading.watchlist` 表 migration |

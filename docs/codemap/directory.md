@@ -18,16 +18,18 @@
 | `app/schemas/user.py` | — | UserRead / UserCreate / UserUpdate（fastapi-users schemas） |
 | `app/schemas/portfolio.py` | — | PortfolioRead / HoldingRead / TradeRead / PerformanceRead / PortfolioStats |
 | `app/schemas/market.py` | — | InstrumentRead / QuoteRead / CandleItem / CandleResponse |
-| `app/schemas/ai.py` | — | AnalyzeRequest / AnalyzeResponse / AiDecisionRead |
+| `app/api/ai.py` | [ai.md](app/api/ai.md) | POST /ai/analyze（觸發）、GET /ai/decisions（歷史、單筆） |
+| `app/api/ws.py` | [ws.md](app/api/ws.md) | WS /ws/quotes（報價）、WS /ws/ai-stream（AI 進度） |
 | `app/services/portfolio.py` | — | Portfolio / Holding / Trade / Performance 查詢；stats 聚合計算 |
 | `app/services/market.py` | — | Quote / Candle 查詢（自動路由歷史/盤中）；Instrument 搜尋 |
 | `app/services/fbs.py` | [fbs.md](app/services/fbs.md) | `FbsClient` singleton：connect/disconnect/is_connected；sync_instruments/quote/intraday_candles/historical_candles；fetch_quote/candles |
+| `app/services/pubsub.py` | [pubsub.md](app/services/pubsub.md) | Redis Pub/Sub 封裝（報價與 AI 事件發佈） |
 | `app/services/external_data.py` | — | yfinance + TWSE API fetch/parse/upsert；clean_number()、parse_institutional_row()、parse_margin_row_full() 等純函式 |
+
 | `app/tasks.py` | [tasks.md](app/tasks.md) | TRACE 層級、is_trading_hours()、get_watch_symbols()、8 個 cron tasks |
 | `app/worker.py` | [worker.md](app/worker.md) | ARQ WorkerSettings + startup/shutdown hooks |
 | `app/api/portfolio.py` | — | GET /portfolio, /holdings, /trades, /performance, /stats；POST /portfolio/init |
 | `app/api/market.py` | — | GET /market/quote/{symbol}, /candles/{symbol}, /search |
-| `app/api/ai.py` | [ai.md](app/api/ai.md) | POST /ai/analyze（觸發）、GET /ai/decisions（歷史、單筆） |
 
 ## alembic/
 
