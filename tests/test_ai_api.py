@@ -148,14 +148,27 @@ async def test_get_decisions_empty(override_user_dependency):
 @pytest.mark.asyncio
 async def test_get_decision_not_found(override_user_dependency):
     """GET /ai/decisions/{session_id}: returns 404 for unknown session."""
+    from app.database import get_db
+
     fake_session_id = uuid.uuid4()
     app.state.arq = AsyncMock()
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        response = await ac.get(f"/ai/decisions/{fake_session_id}")
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = None
+    mock_session = AsyncMock()
+    mock_session.execute = AsyncMock(return_value=mock_result)
 
-    assert response.status_code == 404
-    assert response.json()["detail"] == "Decision not found"
+    async def mock_get_db():
+        yield mock_session
+
+    app.dependency_overrides[get_db] = mock_get_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            response = await ac.get(f"/ai/decisions/{fake_session_id}")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Decision not found"
+    finally:
+        del app.dependency_overrides[get_db]
 
 
 @pytest.mark.asyncio
@@ -174,4 +187,4 @@ async def test_analyze_symbol_case_insensitive(mock_arq_pool, override_user_depe
     # Check that symbols are uppercase
     calls = mock_arq_pool.enqueue_job.call_args_list
     symbols = [call[0][2] for call in calls]
-    assert all(sym.isupper() for sym in symbols)
+    assert all(sym == sym.upper() for sym in symbols)
