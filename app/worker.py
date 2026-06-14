@@ -36,9 +36,9 @@ async def startup(ctx: dict) -> None:
     try:
         fbs_client.connect()
         logger.info("Worker startup: FBS connected")
-    except RuntimeError as e:
-        logger.critical("Worker startup: FBS login failed - %s", e)
-        raise
+    except Exception as e:
+        logger.warning("Worker startup: FBS unavailable (%s), continuing without FBS", e)
+        logger.warning("Worker startup: FBS-dependent tasks will skip until reconnected")
 
     engine = create_async_engine(settings.database_url, pool_size=5)
     ctx["db_factory"] = async_sessionmaker(engine, expire_on_commit=False)
