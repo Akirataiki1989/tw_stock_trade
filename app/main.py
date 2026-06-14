@@ -20,33 +20,41 @@ async def lifespan(app: FastAPI):
     await app.state.arq.aclose()
 
 
-app = FastAPI(title="TW Stock Trade API", lifespan=lifespan)
+app = FastAPI(
+    title="TW Stock Trade API",
+    lifespan=lifespan,
+    docs_url="/api/v1/docs",
+    redoc_url=None,
+    openapi_url="/api/v1/openapi.json",
+)
 
-# Auth: POST /auth/jwt/login, POST /auth/jwt/logout
+V1 = "/api/v1"
+
+# Auth: POST /api/v1/auth/jwt/login, POST /api/v1/auth/jwt/logout
 app.include_router(
     fastapi_users.get_auth_router(auth_backend),
-    prefix="/auth/jwt",
+    prefix=f"{V1}/auth/jwt",
     tags=["auth"],
 )
 
-# Register: POST /auth/register
+# Register: POST /api/v1/auth/register
 app.include_router(
     fastapi_users.get_register_router(UserRead, UserCreate),
-    prefix="/auth",
+    prefix=f"{V1}/auth",
     tags=["auth"],
 )
 
-# Users: GET/PATCH /users/me, GET/PATCH /users/{id}
+# Users: GET/PATCH /api/v1/users/me, GET/PATCH /api/v1/users/{id}
 app.include_router(
     fastapi_users.get_users_router(UserRead, UserUpdate),
-    prefix="/users",
+    prefix=f"{V1}/users",
     tags=["users"],
 )
 
-app.include_router(portfolio_router)
-app.include_router(market_router)
-app.include_router(ai_router)
-app.include_router(ws_router)
+app.include_router(portfolio_router, prefix=V1)
+app.include_router(market_router, prefix=V1)
+app.include_router(ai_router, prefix=V1)
+app.include_router(ws_router)  # /ws/quotes, /ws/ai-stream (no version prefix)
 
 
 @app.get("/health")
