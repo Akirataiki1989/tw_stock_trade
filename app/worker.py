@@ -18,6 +18,7 @@ from app.tasks import (
     task_clear_intraday_candles,
     task_maybe_run_ai,
     task_prune_store_memories,
+    task_run_ai_on_demand,
     task_sync_historical_candles,
     task_sync_institutional_flows,
     task_sync_instruments,
@@ -78,6 +79,7 @@ class WorkerSettings:
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
     on_startup = startup
     on_shutdown = shutdown
+    functions = [task_run_ai_on_demand]
     cron_jobs = [
         # ── Data sync ──────────────────────────────────────────────────────
         cron(task_sync_instruments,         hour=8,  minute=30, run_at_startup=False),

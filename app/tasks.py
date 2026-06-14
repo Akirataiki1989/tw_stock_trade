@@ -377,6 +377,44 @@ async def task_maybe_run_ai(ctx: dict) -> None:
                 _time.monotonic() - t0, ok, fail)
 
 
+async def task_run_ai_on_demand(ctx: dict, user_id: str, symbol: str, session_id: str) -> None:
+    """API 手動觸發的 AI 分析（不受交易時段限制）。"""
+    import uuid as _uuid
+    from app.agent.graph import build_graph
+    from app.agent.state import DebateState
+
+    now = datetime.now(_TZ)
+    thread_id = f"ai_od_{user_id}_{symbol}_{now.strftime('%Y%m%d_%H%M%S')}"
+
+    graph = build_graph(
+        db_factory=ctx["db_factory"],
+        checkpointer=ctx["checkpointer"],
+        store=ctx["store"],
+    )
+
+    try:
+        await graph.ainvoke(
+            {
+                "symbol": symbol,
+                "user_id": user_id,
+                "session_id": session_id,
+                "analyst_reports": [],
+                "debate_state": DebateState(bull_history="", bear_history="",
+                                            history="", current_response="", count=0),
+                "final_decision": None,
+                "executed": False,
+                "execution_note": "",
+            },
+            {"configurable": {"thread_id": thread_id}},
+        )
+        logger.info("task_run_ai_on_demand: user=%s symbol=%s session=%s done",
+                    user_id[:8], symbol, session_id[:8])
+    except Exception as e:
+        logger.error("task_run_ai_on_demand: user=%s symbol=%s error=%s",
+                     user_id[:8], symbol, e)
+        raise
+
+
 async def task_update_trade_outcomes(ctx: dict) -> None:
     """每日 17:00：將 7 天前的 AI 決策損益結果回填至 Store 記憶。"""
     from datetime import timedelta

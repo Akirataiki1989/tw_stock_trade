@@ -1,17 +1,22 @@
 from contextlib import asynccontextmanager
 
+from arq import create_pool
+from arq.connections import RedisSettings
 from fastapi import FastAPI
 
+from app.api.ai import router as ai_router
 from app.api.market import router as market_router
 from app.api.portfolio import router as portfolio_router
+from app.core.config import settings
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.users import auth_backend, fastapi_users
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # DB 由 Alembic 管理，不在此建立 table
+    app.state.arq = await create_pool(RedisSettings.from_dsn(settings.redis_url))
     yield
+    await app.state.arq.aclose()
 
 
 app = FastAPI(title="TW Stock Trade API", lifespan=lifespan)
@@ -39,6 +44,7 @@ app.include_router(
 
 app.include_router(portfolio_router)
 app.include_router(market_router)
+app.include_router(ai_router)
 
 
 @app.get("/health")
