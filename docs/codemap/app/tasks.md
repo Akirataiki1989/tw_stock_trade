@@ -24,7 +24,7 @@ logging.Logger.trace = _trace  # level < DEBUG，記錄 SDK raw request + 錯誤
 | 函式 | 排程 | 說明 |
 |------|------|------|
 | `task_sync_instruments(ctx)` | 每日 08:30 | 全量 upsert market.instruments |
-| `task_sync_quotes(ctx)` | 每分鐘 | 盤中才執行；isClose probe 跳過假日 |
+| `task_sync_quotes(ctx)` | 每分鐘 | 盤中才執行；isClose probe 跳過假日；同步後呼叫 `publish_quote()` 推送 Redis pub/sub |
 | `task_sync_intraday_candles(ctx)` | 每 5 分鐘 | 盤中；timeframe="5" |
 | `task_sync_historical_candles(ctx)` | 每日 14:00 | 增量；首次補 2 年；FBS 限 1 年/次拆兩次 |
 | `task_clear_intraday_candles(ctx)` | 每日 14:30 | DELETE FROM market.intraday_candles |
@@ -36,9 +36,16 @@ logging.Logger.trace = _trace  # level < DEBUG，記錄 SDK raw request + 錯誤
 | `task_cleanup_checkpoints(ctx)` | 每日 03:00 | 刪除過期的 LangGraph checkpoints (短期記憶) |
 | `task_prune_store_memories(ctx)` | 每週日 02:00 | 刪除單一標的過量的向量記憶 (長期記憶) |
 
+## On-Demand Task
+
+| 函式 | 觸發方式 | 說明 |
+|------|---------|------|
+| `task_run_ai_on_demand(ctx, user_id, symbol, session_id)` | ARQ enqueue（非 cron）| 對單一 symbol 執行 LangGraph 分析；透過 `ctx["redis"]` 發佈 `ai:stream:{session_id}` 事件（started / completed / failed） |
+
 ## 依賴
 
 - `app.services.fbs.fbs_client`（全域 singleton）
 - `app.models.market.HistoricalCandle`（歷史 K 增量查詢）
 - `app.agent.graph.build_graph`（執行 AI 決策）
+- `app.services.pubsub.publish_quote` / `publish_ai_event`（Redis 推送）
 - `sqlalchemy.text`（UNION 查詢、DELETE）

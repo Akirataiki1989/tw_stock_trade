@@ -17,6 +17,7 @@ async def startup(ctx: dict) -> None
    - 初始化 `GoogleGenerativeAIEmbeddings`。
    - 初始化 `AsyncPostgresStore` (長期記憶)，手動進入其 `_cm` 非同步上下文。
 5. **Graph**：呼叫 `build_graph` 並編譯後存入 `ctx["agent"]`。
+6. **Redis pub/sub client**：`aioredis.from_url(redis_url, decode_responses=True)` 存入 `ctx["redis"]`，供 `task_run_ai_on_demand` 發佈 AI 事件串流使用。
 
 ## shutdown(ctx)
 
@@ -27,6 +28,7 @@ async def shutdown(ctx: dict) -> None
 1. `fbs_client.disconnect()`。
 2. 清理 AI 資源：依序執行 `store._cm.__aexit__` 與 `checkpointer._cm.__aexit__`。
 3. `await ctx["engine"].dispose()`。
+4. `await ctx["redis"].aclose()`。
 
 ## WorkerSettings
 
@@ -60,6 +62,14 @@ async def shutdown(ctx: dict) -> None
 uv run arq app.worker.WorkerSettings
 ```
 
+## functions 列表
+
+除 cron_jobs 外，`WorkerSettings.functions` 還包含：
+
+| 函式 | 說明 |
+|------|------|
+| `task_run_ai_on_demand` | 按需 AI 分析，由 `POST /api/v1/ai/analyze` 透過 ARQ enqueue 觸發 |
+
 ## 依賴
 
 - `app.core.config.settings`
@@ -67,3 +77,4 @@ uv run arq app.worker.WorkerSettings
 - `app.agent.memory` (Checkpointer / Store)
 - `app.agent.graph` (build_graph)
 - `app.tasks` (所有 task 函式)
+- `redis.asyncio` (pub/sub client)

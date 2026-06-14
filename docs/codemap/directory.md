@@ -26,10 +26,15 @@
 | `app/services/pubsub.py` | [pubsub.md](app/services/pubsub.md) | Redis Pub/Sub 封裝（報價與 AI 事件發佈） |
 | `app/services/external_data.py` | — | yfinance + TWSE API fetch/parse/upsert；clean_number()、parse_institutional_row()、parse_margin_row_full() 等純函式 |
 
-| `app/tasks.py` | [tasks.md](app/tasks.md) | TRACE 層級、is_trading_hours()、get_watch_symbols()、8 個 cron tasks |
-| `app/worker.py` | [worker.md](app/worker.md) | ARQ WorkerSettings + startup/shutdown hooks |
-| `app/api/portfolio.py` | — | GET /portfolio, /holdings, /trades, /performance, /stats；POST /portfolio/init |
-| `app/api/market.py` | — | GET /market/quote/{symbol}, /candles/{symbol}, /search |
+| `app/tasks.py` | [tasks.md](app/tasks.md) | TRACE 層級、is_trading_hours()、get_watch_symbols()、13 個 cron tasks + task_run_ai_on_demand |
+| `app/worker.py` | [worker.md](app/worker.md) | ARQ WorkerSettings + startup/shutdown hooks（含 Redis pub/sub client） |
+| `app/api/portfolio.py` | — | GET /api/v1/portfolio, /holdings, /trades, /performance, /stats；POST /portfolio/init |
+| `app/api/market.py` | — | GET /api/v1/market/quote/{symbol}, /candles/{symbol}, /search |
+| `app/agent/state.py` | [agent/state.md](app/agent/state.md) | DebateState TypedDict |
+| `app/agent/memory.py` | [agent/memory.md](app/agent/memory.md) | AsyncPostgresSaver / AsyncPostgresStore 初始化 |
+| `app/agent/prompts.py` | [agent/prompts.md](app/agent/prompts.md) | 各分析師 system prompt |
+| `app/agent/nodes.py` | [agent/nodes.md](app/agent/nodes.md) | 各 node 函式（analyst / bull / bear / risk / decide / persist） |
+| `app/agent/graph.py` | [agent/graph.md](app/agent/graph.md) | build_graph()、熔斷機制、conditional edges |
 
 ## alembic/
 
@@ -40,8 +45,10 @@
 | `alembic/versions/0002_add_watchlist.py` | [0002.md](alembic/versions/0002.md) | migration 0002：新增 `trading.watchlist` 表 |
 | `alembic/versions/0003_add_external_data_tables.py` | [0003.md](alembic/versions/0003.md) | migration 0003：新增 `market.us_market_daily`、`institutional_flows`、`margin_trading` |
 
-## 待建模組（尚無對應 CodeMap）
+## scripts/
 
-| 路徑 | 說明 | 前置條件 |
-|------|------|---------|
-| `app/agents/` | LangGraph Agent | ARQ Worker |
+| 路徑 | 說明 |
+|------|------|
+| `scripts/start_api.sh` | FastAPI server 開機啟動腳本（Task Scheduler `tw-stock-api`） |
+| `scripts/start_worker.sh` | ARQ Worker 開機啟動腳本（Task Scheduler `tw-stock-worker`） |
+| `scripts/start_tunnel.sh` | Cloudflare Tunnel 開機啟動腳本（Task Scheduler `tw-stock-tunnel`） |
