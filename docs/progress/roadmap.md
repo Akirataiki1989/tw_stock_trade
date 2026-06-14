@@ -1,6 +1,6 @@
 # 開發路線圖
 
-> 最後更新：2026-06-14
+> 最後更新：2026-06-14（Step 8 部分完成，Step 9 Frontend 新增）
 
 ## 任務依賴圖
 
@@ -153,12 +153,48 @@
 
 ---
 
-#### Step 8：部署設定
+#### Step 8：部署設定 ✅
 **前置條件**：Step 1–7 全部完成  
 **架構決策**：FastAPI + ARQ Worker 直接跑在 NAS DSM；PostgreSQL + Redis 跑在 Docker 容器
 
-- [ ] Synology Task Scheduler 設定 uvicorn 開機自動啟動
-- [ ] Synology Task Scheduler 設定 ARQ Worker 開機自動啟動
-- [ ] Redis Docker 容器設定
-- [ ] Cloudflare Tunnel 連通測試
-- [ ] `.env` 生產環境設定
+- [x] `scripts/start_api.sh` + `scripts/start_worker.sh` 建立（含完整 UV 環境變數）
+- [x] Synology Task Scheduler 設定 uvicorn 開機自動啟動（task: `tw-stock-api`，root，boot trigger）
+- [x] Synology Task Scheduler 設定 ARQ Worker 開機自動啟動（task: `tw-stock-worker`，root，boot trigger）
+- [x] `.env` 生產環境設定（GEMINI_API_KEY、GEMINI_CHAT_MODEL=gemini-3.5-flash）
+- [x] 驗證：API server port 8090 啟動正常，Worker 13 functions 全數載入，FBS 連線成功
+- [x] Cloudflare Tunnel 設定（`api.guieunuch.cc` → `localhost:8090`，開機自啟，`scripts/start_tunnel.sh`）
+
+---
+
+#### Step 9：Frontend Dashboard（獨立倉庫）
+**前置條件**：Step 7 WebSocket、Step 8 部署  
+**倉庫**：另開 `tw-stock-trade-web`（Next.js，不放在此 repo）  
+**Spec**：`docs/superpowers/specs/2026-06-14-frontend-dashboard-spec.md`
+
+**Stack**
+- Next.js 15（App Router）
+- shadcn/ui（客製深色主題）
+- Tailwind v4
+- Recharts
+- @phosphor-icons/react
+- motion/react
+
+**版面：Option B**
+- Header（64px fixed）：TWSE ticker + 2 語意 dot + theme toggle
+- KPI Row（72px）：總資產 / 可用現金 / 持倉市值 / 勝率，非等寬
+- Left 60%（Tab）：Overview / Holdings / History
+- Right 40%（AI Panel 常駐）：觸發分析 + WS 串流 + 決策 log
+
+**任務清單**
+- [ ] `create-next-app` + 安裝依賴（shadcn init、tailwind v4、recharts、phosphor）
+- [ ] `app/layout.tsx`：global Header + theme provider
+- [ ] `components/header/`：Logo、TickerBar（WS）、StatusDots、ThemeToggle
+- [ ] `components/kpi/`：KPIRow（4 格非等寬）
+- [ ] `app/page.tsx`：左右 60/40 分割，Tab + AI Panel
+- [ ] `components/tabs/OverviewTab`：AreaChart（Recharts）+ 近期決策
+- [ ] `components/tabs/HoldingsTab`：持倉表，點列觸發分析
+- [ ] `components/tabs/HistoryTab`：交易紀錄，filter bar
+- [ ] `components/ai-panel/`：RunAnalysis + LiveStream（WS）+ DecisionLog
+- [ ] API client（`lib/api.ts`）：fetch wrapper + JWT token 管理
+- [ ] WS client（`lib/ws.ts`）：quotes + ai-stream hooks
+- [ ] 部署：Vercel（或本機 `next start`）
