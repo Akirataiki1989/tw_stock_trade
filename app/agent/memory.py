@@ -40,7 +40,7 @@ async def search_patterns(
         filter={"symbol": symbol},
         limit=limit,
     )
-    relevant = [r for r in results if getattr(r, "score", 1.0) >= threshold]
+    relevant = [r for r in results if (r.score if r.score is not None else 1.0) >= threshold]
     logger.debug("memory.search: symbol=%s found=%d relevant=%d", symbol, len(results), len(relevant))
     return relevant
 
