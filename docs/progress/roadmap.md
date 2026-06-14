@@ -56,6 +56,7 @@
 | FBS SDK 接入 | `app/services/fbs.py` | FbsClient singleton、sync_*/fetch_* 方法、isClose probe |
 | ARQ Worker | `app/tasks.py`, `app/worker.py` | 8 個 cron tasks：instruments（08:30）、quotes（每分鐘）、intraday_candles（每 5 分）、historical_candles（14:00）、clear_intraday（14:30）、us_market（08:30）、institutional_flows（16:00）、margin_trading（16:05） |
 | 外部數據同步（Step 5.5） | `app/services/external_data.py`、`alembic/versions/0003_add_external_data_tables.py`、`app/models/market.py`、`pyproject.toml` | 整合 yfinance + TWSE T86/MI_MARGN API；新增 `market.us_market_daily`、`institutional_flows`、`margin_trading` 三張表；新增 3 個 cron tasks |
+| LangGraph Agent（Step 6） | `app/agent/`（state/memory/prompts/nodes/graph）、`alembic/versions/0004_add_pgvector_settings.py`、`app/tasks.py`、`app/worker.py` | 多分析師平行分析 + Bull/Bear 辯論 + 熔斷機制；AsyncPostgresSaver checkpoint + AsyncPostgresStore pgvector 長期記憶；4 個 AI cron tasks；15 tests 全過 |
 
 ---
 
@@ -131,14 +132,14 @@
 
 ---
 
-#### Step 6：LangGraph Agent
+#### Step 6：LangGraph Agent ✅
 **前置條件**：Step 5 ARQ Worker（市場資料來源）、Step 5.5 外部數據同步、Step 3 portfolio API（交易執行）  
 **後置任務**：Step 7 WebSocket、前端 AI 功能  
 
-- [ ] `app/agents/` graph 定義（nodes + edges）
-- [ ] 整合 Gemini（`langchain-google-genai`）+ Langfuse 監控
-- [ ] `app/api/ai.py`（POST /ai/analyze, GET /ai/decisions）
-- [ ] 寫入 `trading.ai_decisions` 快照
+- [x] `app/agent/` graph 定義（nodes + edges）
+- [x] 整合 Gemini（`langchain-google-genai`）+ AsyncPostgresSaver/pgvector 記憶
+- [x] 寫入 `trading.ai_decisions` 快照（persist_result node）
+- [ ] `app/api/ai.py`（POST /ai/analyze, GET /ai/decisions）← 待 Step 7 前補上
 
 ---
 
@@ -157,10 +158,6 @@
 
 - [ ] Synology Task Scheduler 設定 uvicorn 開機自動啟動
 - [ ] Synology Task Scheduler 設定 ARQ Worker 開機自動啟動
-- [ ] Redis Docker 容器設定
-- [ ] Cloudflare Tunnel 連通測試
-- [ ] `.env` 生產環境設定
-ARQ Worker 開機自動啟動
 - [ ] Redis Docker 容器設定
 - [ ] Cloudflare Tunnel 連通測試
 - [ ] `.env` 生產環境設定
