@@ -139,7 +139,8 @@
 - [x] `app/agent/` graph 定義（nodes + edges）
 - [x] 整合 Gemini（`langchain-google-genai`）+ AsyncPostgresSaver/pgvector 記憶
 - [x] 寫入 `trading.ai_decisions` 快照（persist_result node）
-- [ ] `app/api/ai.py`（POST /ai/analyze, GET /ai/decisions）← 待 Step 7 前補上
+- [x] app/api/ai.py（POST /ai/analyze, GET /ai/decisions, GET /ai/decisions/{session_id}）
+
 
 ---
 

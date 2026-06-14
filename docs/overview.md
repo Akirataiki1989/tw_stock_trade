@@ -48,6 +48,7 @@
 | `app/agent/prompts.py` | AI 角色提示詞常數 |
 | `app/agent/nodes.py` | Graph 節點工廠與業務邏輯、熔斷機制 |
 | `app/agent/graph.py` | LangGraph 編排與 LLM 初始化 |
+| `app/api/ai.py` | POST /ai/analyze（觸發分析）、GET /ai/decisions（決策歷史）、GET /ai/decisions/{session_id}（單筆詳情） |
 | `app/tasks.py` | 自訂 TRACE 層級、`is_trading_hours()`、`get_watch_symbols()`、AI 相關 4 個 cron tasks (總計 12 個) |
 | `app/worker.py` | ARQ `WorkerSettings`（redis、cron_jobs、max_jobs=10、job_timeout=300）、`startup`/`shutdown` hooks |
 | `alembic/versions/0002_add_watchlist.py` | 新增 `trading.watchlist` 表 migration |

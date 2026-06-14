@@ -131,24 +131,61 @@ Base URL: `https://<cloudflare-tunnel-domain>/api`
 
 | Method | Path | 說明 |
 |--------|------|------|
-| POST | `/ai/analyze` | 觸發 LangGraph Agent 分析 |
-| GET | `/ai/decisions` | 取得 AI 決策歷史 |
-| GET | `/ai/decisions/{id}` | 取得單筆 AI 決策詳情 |
+| POST | `/ai/analyze` | 觸發 LangGraph Agent 分析（非同步，立即回傳 session_id） |
+| GET | `/ai/decisions` | 取得 AI 決策歷史（?limit=20&symbol=2330） |
+| GET | `/ai/decisions/{session_id}` | 取得單筆 AI 決策詳情 |
 
 ### POST /ai/analyze
 Request:
 ```json
 {
-  "symbols": ["2330", "2317", "0050"],
+  "symbols": ["2330", "2454"],
   "mode": "full"
 }
 ```
-Response（streaming via WebSocket，HTTP 只回執行 ID）:
+Response（list，每 symbol 一筆）:
 ```json
-{
-  "session_id": "uuid",
-  "status": "running"
-}
+[
+  {
+    "session_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "status": "running"
+  },
+  {
+    "session_id": "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy",
+    "status": "running"
+  }
+]
+```
+
+### GET /ai/decisions
+Response（其中 decisions 是 JSONB）:
+```json
+[
+  {
+    "id": 1,
+    "session_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "analysis": "技術面偏多...",
+    "decisions": {
+      "2330": {
+        "action": "BUY",
+        "confidence": 0.82,
+        "shares": 1000,
+        "target_price": 950.0,
+        "stop_loss": 840.0,
+        "reasoning": "..."
+      }
+    },
+    "market_summary": "bull",
+    "model_used": "gemini-2.0-flash",
+    "tokens_used": 0,
+    "execution_ms": 0,
+    "agent_reports": {
+      "analyst_reports": [],
+      "debate_history": ""
+    },
+    "created_at": "2026-06-14T10:00:00+08:00"
+  }
+]
 ```
 
 ---

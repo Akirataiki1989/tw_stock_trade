@@ -27,6 +27,7 @@
 | `app/worker.py` | [worker.md](app/worker.md) | ARQ WorkerSettings + startup/shutdown hooks |
 | `app/api/portfolio.py` | — | GET /portfolio, /holdings, /trades, /performance, /stats；POST /portfolio/init |
 | `app/api/market.py` | — | GET /market/quote/{symbol}, /candles/{symbol}, /search |
+| `app/api/ai.py` | [ai.md](app/api/ai.md) | POST /ai/analyze（觸發）、GET /ai/decisions（歷史、單筆） |
 
 ## alembic/
 
