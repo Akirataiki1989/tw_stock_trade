@@ -28,6 +28,13 @@ class Settings(BaseSettings):
 
     # AI
     gemini_api_key: str = ""
+    gemini_embedding_model: str = "models/text-embedding-004"
+    gemini_chat_model: str = "gemini-2.0-flash"
+    ai_max_debate_rounds: int = 1          # Bull/Bear exchange rounds (1 = Bull→Bear→done)
+    store_similarity_threshold: float = 0.75
+    store_max_results: int = 10
+    store_max_per_symbol: int = 100
+    checkpoint_ttl_days: int = 7
 
     # Langfuse
     langfuse_public_key: str = ""
