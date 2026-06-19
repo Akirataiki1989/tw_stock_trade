@@ -5,3 +5,4 @@ from app.models.base import Base
 
 class User(SQLAlchemyBaseUserTableUUID, Base):
     __tablename__ = "users"
+    __table_args__ = {"schema": "public"}
