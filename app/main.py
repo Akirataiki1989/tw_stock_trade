@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from arq import create_pool
 from arq.connections import RedisSettings
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.ai import router as ai_router
 from app.api.market import router as market_router
@@ -26,6 +27,14 @@ app = FastAPI(
     docs_url="/api/v1/docs",
     redoc_url=None,
     openapi_url="/api/v1/openapi.json",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 V1 = "/api/v1"

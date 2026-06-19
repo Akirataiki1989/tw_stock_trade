@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     # Database
     database_url: str
 
+    # CORS
+    cors_origins: list[str] = ["http://localhost:3000"]
+
     # Redis
     redis_url: str = "redis://localhost:6379"
 
