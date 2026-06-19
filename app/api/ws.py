@@ -70,9 +70,16 @@ async def ws_quotes(
                 await pubsub.unsubscribe(*channels)
 
     async def _forward():
-        async for message in pubsub.listen():
-            if message["type"] == "message":
-                await websocket.send_text(message["data"])
+        # pubsub.listen() returns immediately while nothing is subscribed yet
+        # (subscribe() is only called once _receive() processes the client's
+        # first "subscribe" message), so poll until there's something to listen to.
+        while True:
+            if not pubsub.subscribed:
+                await asyncio.sleep(0.05)
+                continue
+            async for message in pubsub.listen():
+                if message["type"] == "message":
+                    await websocket.send_text(message["data"])
 
     receive_task = asyncio.create_task(_receive())
     forward_task = asyncio.create_task(_forward())
