@@ -10,6 +10,15 @@ export HOME=/volume1/web/codeserver
 
 cd /volume1/web/codeserver/tw_stock_trade
 
+# Self-heal: rebuild .venv if it's missing/broken (recurring issue on this NAS)
+if [ ! -x .venv/bin/python ] || [ ! -x .venv/bin/uvicorn ]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') .venv missing or broken, rebuilding..." \
+        >> /volume1/web/codeserver/tw_stock_trade/log/api.log
+    rm -rf .venv
+    /volume1/web/codeserver/.tools/uv sync --python 3.12 \
+        >> /volume1/web/codeserver/tw_stock_trade/log/api.log 2>&1
+fi
+
 # Wait for Redis to be ready (Docker may start after this script)
 until /volume1/web/codeserver/.tools/uv run python -c \
     "import socket; s=socket.create_connection(('localhost',6379),timeout=2); s.close()" \
