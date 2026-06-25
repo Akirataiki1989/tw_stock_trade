@@ -105,7 +105,7 @@ def make_fetch_context(db_factory: async_sessionmaker) -> Callable:
 
             us_row = (await db.execute(text(
                 "SELECT sp500_close, sp500_change, nasdaq_close, nasdaq_change "
-                "FROM market.us_market_daily ORDER BY trade_date DESC LIMIT 1"
+                "FROM market.us_market_daily ORDER BY date DESC LIMIT 1"
             ))).fetchone()
             us_market = ({"sp500": {"close": float(us_row[0] or 0), "change": float(us_row[1] or 0)},
                           "nasdaq": {"close": float(us_row[2] or 0), "change": float(us_row[3] or 0)}}
@@ -113,7 +113,7 @@ def make_fetch_context(db_factory: async_sessionmaker) -> Callable:
 
             inst_row = (await db.execute(text(
                 "SELECT foreign_net, investment_trust_net, dealer_net "
-                "FROM market.institutional_flows WHERE symbol=:s ORDER BY trade_date DESC LIMIT 1"
+                "FROM market.institutional_flows WHERE symbol=:s ORDER BY date DESC LIMIT 1"
             ), {"s": symbol})).fetchone()
             institutional_flow = ({"foreign": int(inst_row[0] or 0),
                                     "investment_trust": int(inst_row[1] or 0),
@@ -122,7 +122,7 @@ def make_fetch_context(db_factory: async_sessionmaker) -> Callable:
 
             margin_row = (await db.execute(text(
                 "SELECT margin_balance, short_balance FROM market.margin_trading "
-                "WHERE symbol=:s ORDER BY trade_date DESC LIMIT 1"
+                "WHERE symbol=:s ORDER BY date DESC LIMIT 1"
             ), {"s": symbol})).fetchone()
             margin_trading = ({"margin_balance": int(margin_row[0] or 0),
                                 "short_balance": int(margin_row[1] or 0)}
