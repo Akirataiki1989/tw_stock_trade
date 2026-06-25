@@ -8,7 +8,7 @@
 
 `AiPanel` is the top-level component that:
 1. Holds `useAiSession` and `useAiDecisions`
-2. On session `done`: calls `decisions.refresh()` to update the log
+2. Watches `completedSessionId` from `useAiSession`; calls `decisions.refresh()` when it changes to a non-null value
 3. Passes `selectedSymbol` down to `RunAnalysisForm` as `initialSymbol`
 4. Composes `RunAnalysisForm` + `AnalysisDisplay` + `DecisionLog`
 
@@ -53,7 +53,7 @@ app/page.tsx
         └─ DecisionLog  decisions={...}  isLoading={...}  error={...}
 ```
 
-On `session.state.status === "done"`: call `decisions.refresh()` inside a `useEffect` keyed on the session result's `session_id` (avoids double-refresh on re-render).
+`completedSessionId` from `useAiSession` drives `decisions.refresh()` via `useEffect([completedSessionId])` — cleaner than watching `session.state` shape, no manual `useRef` bookkeeping needed.
 
 ---
 
@@ -101,6 +101,7 @@ describe("AiPanel", () => {
       state: { status: "idle" },
       start: vi.fn(),
       reset: vi.fn(),
+      completedSessionId: null,
     });
 
     render(<AiPanel token="tok" />);
@@ -114,14 +115,14 @@ describe("AiPanel", () => {
       state: { status: "idle" },
       start: vi.fn(),
       reset: vi.fn(),
+      completedSessionId: null,
     });
 
     render(<AiPanel token="tok" selectedSymbol="2330" />);
     expect(screen.getByLabelText<HTMLInputElement>("Symbol").value).toBe("2330");
   });
 
-  it("calls decisions.refresh() after session completes", async () => {
-    const mockStart = vi.fn();
+  it("calls decisions.refresh() when completedSessionId becomes non-null", async () => {
     vi.mocked(useAiSessionModule.useAiSession).mockReturnValue({
       state: {
         status: "done",
@@ -131,8 +132,9 @@ describe("AiPanel", () => {
           execution_ms: 1000, agent_reports: null, created_at: "2026-06-25T10:00:00Z",
         },
       },
-      start: mockStart,
+      start: vi.fn(),
       reset: vi.fn(),
+      completedSessionId: "sess-done",
     });
 
     render(<AiPanel token="tok" />);
@@ -162,16 +164,9 @@ export function AiPanel({ token, selectedSymbol }: { token: string; selectedSymb
   const session = useAiSession(token);
   const decisions = useAiDecisions(token);
 
-  const refreshedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (
-      session.state.status === "done" &&
-      session.state.result.session_id !== refreshedFor.current
-    ) {
-      refreshedFor.current = session.state.result.session_id;
-      decisions.refresh();
-    }
-  }, [session.state, decisions]);
+    if (session.completedSessionId) decisions.refresh();
+  }, [session.completedSessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isRunning = !["idle", "error"].includes(session.state.status);
 

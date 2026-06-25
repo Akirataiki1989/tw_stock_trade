@@ -51,11 +51,20 @@ type AiSessionState =
   | { status: "done"; result: AiDecisionRead }
   | { status: "error"; message: string };
 
+type AiDecisionSymbol = {
+  action: "BUY" | "SELL" | "HOLD";
+  confidence?: number;    // 0.0–1.0; display as Math.round(x * 100)%
+  shares?: number;
+  target_price?: number;
+  stop_loss?: number;
+  reasoning?: string;     // confirmed field name (not "reason")
+};
+
 type AiDecisionRead = {
   id: number;
   session_id: string;
-  analysis: string | null;
-  decisions: Record<string, unknown> | null;
+  analysis: string | null;        // equals decisions[symbol].reasoning for single-symbol runs
+  decisions: Record<string, AiDecisionSymbol> | null;
   market_summary: string | null;
   model_used: string | null;
   tokens_used: number;
@@ -68,6 +77,7 @@ function useAiSession(token: string | null): {
   state: AiSessionState;
   start: (symbol: string) => void;
   reset: () => void;
+  completedSessionId: string | null;  // set when status reaches "done"; null otherwise
 }
 ```
 
@@ -80,8 +90,10 @@ function useAiSession(token: string | null): {
 - WS URL: `wss://api.guieunuch.cc/ws/ai-stream?session_id={id}&token={jwt}`
 - WS auth: JWT passed as query param (same pattern as `/ws/quotes`).
 - On WS `"failed"` event: transitions to `error` with the event's `error` field.
-- On WS disconnect before `"completed"`: transitions to `error` with "Connection lost".
+- **`terminalReceivedRef`**: set to `true` when `completed` or `failed` event is received. `onclose` only transitions to `error` ("Connection lost") if `!terminalReceivedRef.current` — prevents the backend's normal post-completed WS close from overwriting `fetching`/`done`.
+- **Race condition fix (worker finishes before WS subscribes)**: on `onopen`, immediately poll `GET /ai/decisions/{session_id}` once. If a result already exists in the DB, close the WS and go straight to `done` without waiting for the WS event.
 - No automatic reconnect — user re-submits.
+- `completedSessionId`: set to the session's `session_id` when state reaches `done`, `null` otherwise. Resets to `null` on `reset()` or `start()`.
 - `reset()` closes any open WS connection and returns to `idle`.
 - Cleanup on unmount: close WS, cancel any in-flight fetch.
 
@@ -161,6 +173,31 @@ describe("useAiSession", () => {
 
     await waitFor(() => expect(result.current.state.status).toBe("done"));
     expect(result.current.state).toMatchObject({ status: "done", result: { analysis: "Buy TSMC." } });
+    expect(result.current.completedSessionId).toBe("sess-123");
+  });
+
+  it("backend closing WS after completed does NOT transition to error", async () => {
+    vi.mocked(apiPost).mockResolvedValue([{ session_id: "sess-close", status: "running" }]);
+    vi.mocked(apiGet).mockResolvedValue({
+      id: 2, session_id: "sess-close", analysis: "Hold.", decisions: null,
+      market_summary: null, model_used: "gemini", tokens_used: 50,
+      execution_ms: 2000, agent_reports: null, created_at: "2026-06-25T10:00:00Z",
+    });
+
+    const { result } = renderHook(() => useAiSession("token"));
+    act(() => { result.current.start("2330"); });
+    await waitFor(() => expect(result.current.state.status).toBe("running"));
+
+    // completed event arrives, then backend closes WS
+    act(() => {
+      mockWsInstance.onmessage?.({
+        data: JSON.stringify({ type: "ai_event", event: "completed", symbol: "2330" }),
+      } as MessageEvent);
+    });
+    act(() => { mockWsInstance.onclose?.(); });  // should be ignored
+
+    await waitFor(() => expect(result.current.state.status).toBe("done"));
+    // must NOT have transitioned through error
   });
 
   it("transitions to error on WS failed event", async () => {
@@ -181,15 +218,17 @@ describe("useAiSession", () => {
     expect((result.current.state as { status: "error"; message: string }).message).toBe("AI timeout");
   });
 
-  it("transitions to error on WS disconnect mid-run", async () => {
+  it("transitions to error on WS disconnect without prior terminal event", async () => {
     vi.mocked(apiPost).mockResolvedValue([{ session_id: "sess-789", status: "running" }]);
+    // onopen poll returns nothing yet (not finished)
+    vi.mocked(apiGet).mockResolvedValue(null);
 
     const { result } = renderHook(() => useAiSession("token"));
     act(() => { result.current.start("2330"); });
 
     await waitFor(() => expect(result.current.state.status).toBe("running"));
 
-    act(() => { mockWsInstance.onclose?.(); });
+    act(() => { mockWsInstance.onclose?.(); });  // no terminal event before this
 
     await waitFor(() => expect(result.current.state.status).toBe("error"));
   });
@@ -231,15 +270,19 @@ Expected: `Cannot find module './use-ai-session'`
 State machine using `useReducer`. Key points:
 - `start()` calls `apiPost("/ai/analyze", { symbols: [symbol], mode: "full" }, token)`, takes `[0].session_id`
 - Opens `new WebSocket(\`wss://api.guieunuch.cc/ws/ai-stream?session_id=${id}&token=${token}\`)`
-- `onmessage`: parse JSON, handle `event === "completed"` → call `apiGet("/ai/decisions/${session_id}", token)` → dispatch done
-- `onclose` while in `running`: dispatch error "Connection lost"
+- `onopen`: immediately poll `apiGet("/ai/decisions/${session_id}", token)` once — if result exists (race: worker already done), close WS and dispatch done directly
+- `onmessage`: parse JSON; on `completed`/`failed`, set `terminalReceivedRef.current = true` first, then handle transition
+- `onmessage` `"completed"`: call `apiGet("/ai/decisions/${session_id}", token)` → dispatch done + set `completedSessionId`
+- `onclose`: only dispatch error "Connection lost" if `!terminalReceivedRef.current`
+- `terminalReceivedRef = useRef(false)`, reset on each new `start()` call
 - Store WS ref in `useRef` for cleanup
+- `completedSessionId` tracked in separate `useState<string | null>(null)`, reset on `reset()`/`start()`
 
 ### Step 4 — Run to confirm PASS
 ```bash
 npx vitest run lib/use-ai-session.test.ts
 ```
-Expected: 6 tests pass
+Expected: 7 tests pass
 
 ### Step 5 — Commit
 ```bash
@@ -256,5 +299,6 @@ git commit -m "feat: add useAiSession hook"
 | POST fails (network/4xx/5xx) | → `error` state with "Failed to start analysis" |
 | WS fails to open | → `error` state with "Connection failed" |
 | WS `failed` event | → `error` state with event's `error` field |
-| WS disconnect before `completed` | → `error` state with "Connection lost" |
+| WS disconnect without prior terminal event | → `error` state with "Connection lost" |
+| WS closes after `completed` (normal backend behaviour) | ignored — `terminalReceivedRef` prevents false error |
 | GET /ai/decisions fails after completed | → `error` state with "Failed to load result" |

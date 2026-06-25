@@ -63,19 +63,21 @@ type AnalysisDisplayProps = {
 ```
 ANALYSIS                                    [model] · [Xms]
 ────────────────────────────────────────────────────────
-{analysis text — prose, zinc-300, text-sm, whitespace-pre-wrap}
+{reasoning text — prose, zinc-300, text-sm, whitespace-pre-wrap}
 
 DECISIONS
-  2330  BUY   (confidence: 85%)     ← one row per symbol in decisions JSONB
-  2454  HOLD  (confidence: 60%)
+  2330  BUY   85%  ←  actionBadge + Math.round(confidence*100)%
+  2454  HOLD  60%
 
 DEBATE  [expand ▾]
   {agent_reports.debate_history — collapsed by default, Collapsible}
 ```
 
-- `decisions` JSONB shape is assumed to be `Record<string, { action: string; confidence?: number; reason?: string }>`. If shape differs, this section degrades gracefully (shows raw JSON).
+- **`reasoning` field (confirmed name)**: display `decisions[symbol].reasoning` as the main analysis text. Fall back to `result.analysis` only if `decisions` is null (e.g. multi-symbol aggregated result). The two values are identical for single-symbol runs — prefer the per-symbol one for accuracy.
+- **`confidence`**: `0.0–1.0` float. Display as `Math.round(confidence * 100)%`. Omit if absent.
+- **`decisions` JSONB confirmed shape**: `Record<string, { action: "BUY"|"SELL"|"HOLD"; confidence?: number; shares?: number; target_price?: number; stop_loss?: number; reasoning?: string; }>`. Iterate with `Object.entries(result.decisions ?? {})`. If null, skip the DECISIONS section entirely (no crash).
 - `debate_history` shown in `<pre>` inside a shadcn `Collapsible`, same pattern as `RecentDecisions`.
-- `model_used` + `execution_ms` shown as a subtle line above the divider.
+- `model_used` + `execution_ms / 1000` shown as a subtle line above the divider.
 
 ---
 
@@ -188,22 +190,41 @@ describe("AnalysisDisplay", () => {
     expect(screen.getByText("AI timeout")).toBeInTheDocument();
   });
 
-  it("renders analysis text when done", () => {
+  it("renders reasoning text and confidence when done", () => {
     render(
       <AnalysisDisplay
         state={{
           status: "done",
           result: {
             id: 1, session_id: "sess-1", analysis: "Buy TSMC now.",
-            decisions: { "2330": { action: "BUY", confidence: 0.85 } },
+            decisions: { "2330": { action: "BUY", confidence: 0.85, reasoning: "Strong momentum." } },
             market_summary: null, model_used: "gemini-flash", tokens_used: 100,
             execution_ms: 3000, agent_reports: null, created_at: "2026-06-25T10:00:00Z",
           },
         }}
       />
     );
-    expect(screen.getByText("Buy TSMC now.")).toBeInTheDocument();
+    // prefers decisions[symbol].reasoning over result.analysis
+    expect(screen.getByText("Strong momentum.")).toBeInTheDocument();
     expect(screen.getByText("BUY")).toBeInTheDocument();
+    expect(screen.getByText("85%")).toBeInTheDocument();
+  });
+
+  it("falls back to result.analysis when decisions is null", () => {
+    render(
+      <AnalysisDisplay
+        state={{
+          status: "done",
+          result: {
+            id: 2, session_id: "sess-2", analysis: "Fallback analysis.",
+            decisions: null, market_summary: null, model_used: "gemini-flash",
+            tokens_used: 50, execution_ms: 1500, agent_reports: null,
+            created_at: "2026-06-25T10:00:00Z",
+          },
+        }}
+      />
+    );
+    expect(screen.getByText("Fallback analysis.")).toBeInTheDocument();
   });
 });
 ```
